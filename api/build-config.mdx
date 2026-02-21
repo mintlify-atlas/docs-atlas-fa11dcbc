@@ -1,0 +1,201 @@
+---
+title: 'BuildConfig'
+description: 'Access build-time configuration and runtime settings'
+icon: 'gear'
+---
+
+## Overview
+
+The `BuildConfig` utility provides access to build-time configuration and runtime settings defined in your `electrobun.config.ts` file. It reads from the `build.json` file generated during the build process.
+
+## Import
+
+```typescript
+import { BuildConfig } from "electrobun/bun";
+```
+
+## Methods
+
+### get()
+
+Asynchronously loads and returns the build configuration. The configuration is cached after the first call.
+
+```typescript
+const config = await BuildConfig.get();
+```
+
+<ParamField path="return" type="Promise<BuildConfigType>">
+  Promise that resolves to the build configuration object
+</ParamField>
+
+#### BuildConfigType
+
+<ResponseField name="defaultRenderer" type="'native' | 'cef'">
+  The default renderer to use for webviews when not explicitly specified
+</ResponseField>
+
+<ResponseField name="availableRenderers" type="Array<'native' | 'cef'>">
+  List of renderers available in this build
+</ResponseField>
+
+<ResponseField name="cefVersion" type="string" optional>
+  The CEF version if a custom version was specified in build config
+</ResponseField>
+
+<ResponseField name="bunVersion" type="string" optional>
+  The Bun runtime version if a custom version was specified in build config
+</ResponseField>
+
+<ResponseField name="runtime" type="object" optional>
+  Custom runtime configuration defined in `electrobun.config.ts`
+  
+  <Expandable title="properties">
+    <ResponseField name="exitOnLastWindowClosed" type="boolean" optional>
+      Whether the app should quit when the last window is closed (default: true)
+    </ResponseField>
+    
+    <ResponseField name="[key: string]" type="unknown">
+      Any custom properties you defined in the runtime config
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### getCached()
+
+Synchronously returns the cached build configuration, or `null` if not yet loaded.
+
+```typescript
+const config = BuildConfig.getCached();
+```
+
+<ParamField path="return" type="BuildConfigType | null">
+  The cached build configuration, or null if `get()` hasn't been called yet
+</ParamField>
+
+<Warning>
+This method returns `null` if the configuration hasn't been loaded yet. Use `get()` to ensure the configuration is loaded.
+</Warning>
+
+## Usage Examples
+
+### Basic Usage
+
+```typescript
+import { BuildConfig } from "electrobun/bun";
+
+// Load configuration at startup
+const config = await BuildConfig.get();
+
+console.log("Default renderer:", config.defaultRenderer);
+console.log("Available renderers:", config.availableRenderers);
+```
+
+### Accessing Runtime Configuration
+
+```typescript
+import { BuildConfig } from "electrobun/bun";
+
+const config = await BuildConfig.get();
+
+// Access built-in runtime settings
+if (config.runtime?.exitOnLastWindowClosed === false) {
+  console.log("App will not exit when last window closes");
+}
+
+// Access custom runtime settings
+const apiUrl = config.runtime?.apiBaseUrl as string;
+const maxRetries = config.runtime?.maxRetries as number;
+```
+
+### Checking Available Renderers
+
+```typescript
+import { BuildConfig, BrowserWindow } from "electrobun/bun";
+
+const config = await BuildConfig.get();
+
+// Check if CEF is available
+const hasCef = config.availableRenderers.includes("cef");
+
+// Create window with fallback renderer
+const window = new BrowserWindow({
+  url: "views://index.html",
+  renderer: hasCef ? "cef" : "native"
+});
+```
+
+### Using Cached Configuration
+
+```typescript
+import { BuildConfig } from "electrobun/bun";
+
+// Load once at app start
+await BuildConfig.get();
+
+// Later, access synchronously
+function someFunction() {
+  const config = BuildConfig.getCached();
+  
+  if (config) {
+    console.log("Renderer:", config.defaultRenderer);
+  }
+}
+```
+
+## Configuration Sources
+
+The `BuildConfig` reads from `build.json`, which is generated from your `electrobun.config.ts`:
+
+```typescript
+// electrobun.config.ts
+import type { ElectrobunConfig } from "electrobun/bun";
+
+export default {
+  app: {
+    name: "My App",
+    // ...
+  },
+  build: {
+    mac: {
+      defaultRenderer: "native",
+      bundleCEF: false
+    }
+  },
+  runtime: {
+    exitOnLastWindowClosed: false,
+    apiBaseUrl: "https://api.example.com",
+    featureFlags: {
+      newUI: true
+    }
+  }
+} satisfies ElectrobunConfig;
+```
+
+The `runtime` section is copied directly into `build.json` and accessible via `BuildConfig`.
+
+## Development vs Production
+
+In development mode (when `build.json` doesn't exist), `BuildConfig` returns default values:
+
+```typescript
+{
+  defaultRenderer: "native",
+  availableRenderers: ["native"]
+}
+```
+
+In production builds, it reads the actual configuration from the bundled `build.json` file.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Configuration File" icon="file" href="/configuration/config-file">
+    Learn about electrobun.config.ts
+  </Card>
+  <Card title="Runtime Options" icon="play" href="/configuration/runtime-options">
+    Configure runtime behavior
+  </Card>
+  <Card title="Platform Options" icon="desktop" href="/configuration/platform-options">
+    Platform-specific build settings
+  </Card>
+</CardGroup>

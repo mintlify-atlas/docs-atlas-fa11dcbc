@@ -98,7 +98,8 @@
               "api/screen",
               "api/session",
               "api/socket",
-              "api/paths"
+              "api/paths",
+              "api/build-config"
             ]
           },
           {
