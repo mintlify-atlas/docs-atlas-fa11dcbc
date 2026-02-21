@@ -1,0 +1,387 @@
+---
+title: 'Session'
+description: 'Manage browser sessions, cookies, and storage'
+icon: 'cookie'
+---
+
+The `Session` module manages browser sessions, including cookies, storage, and data partitioning.
+
+## fromPartition
+
+Get or create a session for a specific partition.
+
+```typescript
+import { Session } from 'electrobun/bun';
+
+const session = Session.fromPartition(partition);
+```
+
+<ParamField path="partition" type="string" required>
+  Partition identifier:
+  - `persist:name` - Persistent storage
+  - `ephemeral` - In-memory only (cleared on app close)
+</ParamField>
+
+<ResponseField name="return" type="SessionInstance">
+  Session instance for the partition
+</ResponseField>
+
+## defaultSession
+
+Get the default session.
+
+```typescript
+const session = Session.defaultSession;
+```
+
+<ResponseField name="return" type="SessionInstance">
+  The default session (`persist:default` partition)
+</ResponseField>
+
+## SessionInstance
+
+A session instance provides access to cookies and storage management.
+
+### Properties
+
+<ResponseField name="partition" type="string">
+  The partition identifier for this session
+</ResponseField>
+
+<ResponseField name="cookies" type="SessionCookies">
+  Cookie management API
+</ResponseField>
+
+### clearStorageData
+
+Clear storage data for this session.
+
+```typescript
+session.clearStorageData(types);
+```
+
+<ParamField path="types" type="StorageType[] | 'all'" default="'all'">
+  Storage types to clear:
+  - `cookies`
+  - `localStorage`
+  - `sessionStorage`
+  - `indexedDB`
+  - `webSQL`
+  - `cache`
+  - `all` (default)
+</ParamField>
+
+```typescript
+// Clear all storage
+session.clearStorageData();
+
+// Clear specific types
+session.clearStorageData(['cookies', 'localStorage']);
+```
+
+## Cookies API
+
+Access via `session.cookies`.
+
+### get
+
+Get cookies matching the filter.
+
+```typescript
+const cookies = session.cookies.get(filter);
+```
+
+<ParamField path="filter" type="CookieFilter" optional>
+  Optional filter criteria
+  <Expandable title="CookieFilter">
+    <ParamField path="url" type="string" optional>
+      Filter by URL
+    </ParamField>
+    <ParamField path="name" type="string" optional>
+      Filter by cookie name
+    </ParamField>
+    <ParamField path="domain" type="string" optional>
+      Filter by domain
+    </ParamField>
+    <ParamField path="path" type="string" optional>
+      Filter by path
+    </ParamField>
+    <ParamField path="secure" type="boolean" optional>
+      Filter by secure flag
+    </ParamField>
+    <ParamField path="session" type="boolean" optional>
+      Filter session vs persistent cookies
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="Cookie[]">
+  Array of matching cookies
+</ResponseField>
+
+### set
+
+Set a cookie.
+
+```typescript
+const success = session.cookies.set(cookie);
+```
+
+<ParamField path="cookie" type="Cookie" required>
+  <Expandable title="Cookie">
+    <ParamField path="name" type="string" required>
+      Cookie name
+    </ParamField>
+    <ParamField path="value" type="string" required>
+      Cookie value
+    </ParamField>
+    <ParamField path="domain" type="string" optional>
+      Cookie domain
+    </ParamField>
+    <ParamField path="path" type="string" optional>
+      Cookie path
+    </ParamField>
+    <ParamField path="secure" type="boolean" optional>
+      Whether cookie is secure (HTTPS only)
+    </ParamField>
+    <ParamField path="httpOnly" type="boolean" optional>
+      Whether cookie is HTTP-only
+    </ParamField>
+    <ParamField path="sameSite" type="'no_restriction' | 'lax' | 'strict'" optional>
+      SameSite policy
+    </ParamField>
+    <ParamField path="expirationDate" type="number" optional>
+      Unix timestamp in seconds (omit for session cookie)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if cookie was set successfully
+</ResponseField>
+
+### remove
+
+Remove a specific cookie.
+
+```typescript
+const success = session.cookies.remove(url, name);
+```
+
+<ParamField path="url" type="string" required>
+  URL associated with the cookie
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Cookie name
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if cookie was removed
+</ResponseField>
+
+### clear
+
+Clear all cookies for this session.
+
+```typescript
+session.cookies.clear();
+```
+
+## Examples
+
+### Basic Cookie Management
+
+```typescript
+import { Session } from 'electrobun/bun';
+
+const session = Session.defaultSession;
+
+// Set a cookie
+session.cookies.set({
+  name: 'auth_token',
+  value: 'abc123',
+  domain: 'example.com',
+  path: '/',
+  secure: true,
+  httpOnly: true,
+});
+
+// Get cookies
+const cookies = session.cookies.get({ domain: 'example.com' });
+console.log('Cookies:', cookies);
+
+// Remove a cookie
+session.cookies.remove('https://example.com', 'auth_token');
+```
+
+### Session Cookies
+
+```typescript
+import { Session } from 'electrobun/bun';
+
+const session = Session.defaultSession;
+
+// Set session cookie (no expiration)
+session.cookies.set({
+  name: 'session_id',
+  value: 'xyz789',
+  domain: 'example.com',
+});
+
+// Set persistent cookie (with expiration)
+const oneWeek = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+session.cookies.set({
+  name: 'remember_me',
+  value: 'true',
+  domain: 'example.com',
+  expirationDate: oneWeek,
+});
+```
+
+### Isolated Sessions
+
+Use different partitions for isolated browsing contexts:
+
+```typescript
+import { Session, BrowserView } from 'electrobun/bun';
+
+// Create views with different partitions
+const view1 = new BrowserView({
+  url: 'https://example.com',
+  partition: 'persist:user1', // Persistent for user 1
+});
+
+const view2 = new BrowserView({
+  url: 'https://example.com',
+  partition: 'persist:user2', // Persistent for user 2
+});
+
+const view3 = new BrowserView({
+  url: 'https://example.com',
+  partition: 'ephemeral', // Temporary (cleared on close)
+});
+
+// Access session data
+const session1 = Session.fromPartition('persist:user1');
+const cookies1 = session1.cookies.get();
+```
+
+### Clear Private Data
+
+```typescript
+import { Session } from 'electrobun/bun';
+
+function clearPrivateData() {
+  const session = Session.defaultSession;
+  
+  // Clear all browsing data
+  session.clearStorageData();
+  
+  // Or clear specific types
+  session.clearStorageData([
+    'cookies',
+    'localStorage',
+    'cache',
+  ]);
+}
+```
+
+### Cookie Inspector
+
+```typescript
+import { Session } from 'electrobun/bun';
+
+function inspectCookies(url: string) {
+  const session = Session.defaultSession;
+  const cookies = session.cookies.get({ url });
+  
+  console.log(`Cookies for ${url}:`);
+  cookies.forEach(cookie => {
+    console.log(`  ${cookie.name}=${cookie.value}`);
+    console.log(`    Domain: ${cookie.domain}`);
+    console.log(`    Path: ${cookie.path}`);
+    console.log(`    Secure: ${cookie.secure}`);
+    console.log(`    HttpOnly: ${cookie.httpOnly}`);
+    console.log(`    SameSite: ${cookie.sameSite}`);
+    if (cookie.expirationDate) {
+      const date = new Date(cookie.expirationDate * 1000);
+      console.log(`    Expires: ${date.toLocaleString()}`);
+    }
+  });
+}
+```
+
+## Storage Partitions
+
+Partitions isolate storage and cookies between different contexts:
+
+### Persistent Partitions
+
+Data persists across app restarts:
+
+```typescript
+const session = Session.fromPartition('persist:myapp');
+```
+
+### Ephemeral Partitions
+
+Data is cleared when the app closes:
+
+```typescript
+const session = Session.fromPartition('ephemeral');
+```
+
+## Types
+
+### Cookie
+
+```typescript
+interface Cookie {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  secure?: boolean;
+  httpOnly?: boolean;
+  sameSite?: 'no_restriction' | 'lax' | 'strict';
+  expirationDate?: number; // Unix timestamp in seconds
+}
+```
+
+### CookieFilter
+
+```typescript
+interface CookieFilter {
+  url?: string;
+  name?: string;
+  domain?: string;
+  path?: string;
+  secure?: boolean;
+  session?: boolean;
+}
+```
+
+### StorageType
+
+```typescript
+type StorageType =
+  | 'cookies'
+  | 'localStorage'
+  | 'sessionStorage'
+  | 'indexedDB'
+  | 'webSQL'
+  | 'cache'
+  | 'all';
+```
+
+## Notes
+
+- Different partitions have completely isolated storage
+- Use ephemeral partitions for private/incognito browsing
+- Cookie changes may not be immediately visible in existing web contexts
+
+## Related
+
+- [BrowserView](/api/browser-view) - Specify partition when creating views
+- [BrowserWindow](/api/browser-window) - Window management

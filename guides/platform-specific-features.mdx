@@ -1,0 +1,545 @@
+---
+title: Platform-Specific Features
+description: Handle macOS, Windows, and Linux platform differences in Electrobun
+---
+
+## Overview
+
+Electrobun runs on macOS, Windows, and Linux. While most APIs work identically across platforms, some features require platform-specific handling.
+
+## Detecting the Platform
+
+Use the `OS` constant to detect the current platform:
+
+```typescript
+import { OS } from "electrobun/shared";
+
+console.log(`Running on: ${OS}`);
+// "macos", "win", or "linux"
+
+if (OS === "macos") {
+  console.log("Running on macOS");
+} else if (OS === "win") {
+  console.log("Running on Windows");
+} else if (OS === "linux") {
+  console.log("Running on Linux");
+}
+```
+
+## Platform-Specific Code
+
+### Conditional Logic
+
+```typescript
+import { OS } from "electrobun/shared";
+import { BrowserWindow } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  title: "My App",
+  titleBarStyle: OS === "macos" ? "hiddenInset" : "default",
+  frame: {
+    width: 1200,
+    height: OS === "win" ? 850 : 800,  // Extra space for Windows title bar
+    x: 100,
+    y: 100,
+  },
+});
+```
+
+### Platform-Specific Modules
+
+Organize platform code into separate files:
+
+```typescript src/bun/index.ts
+import { OS } from "electrobun/shared";
+import { setupMacOS } from "./macos";
+import { setupWindows } from "./windows";
+import { setupLinux } from "./linux";
+
+if (OS === "macos") {
+  setupMacOS();
+} else if (OS === "win") {
+  setupWindows();
+} else {
+  setupLinux();
+}
+```
+
+## macOS-Specific Features
+
+### Title Bar Styles
+
+macOS supports special title bar styles:
+
+```typescript
+import { BrowserWindow } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  titleBarStyle: "hiddenInset",  // Transparent title bar with traffic lights
+  transparent: false,
+});
+```
+
+<Note>
+`hiddenInset` is macOS-only. It creates a transparent title bar with native window controls (traffic lights) inset into the window.
+</Note>
+
+### Menu Bar Integration
+
+macOS shows the application menu in the menu bar:
+
+```typescript
+import { ApplicationMenu } from "electrobun/bun";
+
+ApplicationMenu.setApplicationMenu([
+  {
+    label: "MyApp",  // App name on macOS
+    submenu: [
+      { label: "About MyApp", role: "about" },
+      { type: "divider" },
+      { label: "Quit", role: "quit" },
+    ],
+  },
+  // ... other menus
+]);
+```
+
+### Tray Icons
+
+macOS tray icons appear in the menu bar:
+
+```typescript
+import { Tray } from "electrobun/bun";
+
+const tray = new Tray({
+  title: "⚡",  // Emoji or text
+  template: true,  // Adapts to dark/light mode
+});
+```
+
+<Tip>
+Use `template: true` on macOS for icons that automatically adapt to dark/light mode.
+</Tip>
+
+### Dock Integration
+
+macOS apps can use the Dock for notifications and progress:
+
+```typescript
+// Badge the dock icon (coming soon)
+// app.dock.setBadge("5");
+```
+
+## Windows-Specific Features
+
+### Title Bar in Window
+
+Windows shows the menu in the window title bar:
+
+```typescript
+import { BrowserWindow } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  titleBarStyle: "default",  // Standard Windows title bar
+  frame: {
+    height: 850,  // Extra height for title bar
+  },
+});
+```
+
+### System Tray
+
+Windows tray icons appear in the system tray (notification area):
+
+```typescript
+import { Tray } from "electrobun/bun";
+
+const tray = new Tray({
+  image: "views://assets/tray-icon.png",
+  width: 16,
+  height: 16,
+});
+
+tray.setMenu([
+  { label: "Show Window", action: "show" },
+  { label: "Exit", action: "quit" },
+]);
+```
+
+<Note>
+Use 16x16 or 32x32 PNG images for Windows tray icons.
+</Note>
+
+### File Paths
+
+Windows uses backslashes in paths:
+
+```typescript
+import { OS } from "electrobun/shared";
+import { join } from "path";
+
+// Use path.join for cross-platform paths
+const configPath = join(Utils.paths.userData, "config.json");
+// macOS/Linux: /Users/me/.local/share/app/config.json
+// Windows: C:\Users\me\AppData\Local\app\config.json
+
+// Convert to platform-specific format if needed
+if (OS === "win") {
+  const windowsPath = configPath.replace(/\//g, "\\");
+}
+```
+
+### Update Process
+
+Windows requires special handling for updates:
+
+```typescript
+// Windows uses a batch script to replace files
+// This happens automatically in Updater.applyUpdate()
+await Updater.applyUpdate();
+// Creates update.bat, schedules it, and exits
+```
+
+## Linux-Specific Features
+
+### Desktop Environment Variations
+
+Linux has many desktop environments (GNOME, KDE, XFCE, etc.):
+
+```typescript
+import { OS } from "electrobun/shared";
+
+if (OS === "linux") {
+  console.log("Running on Linux");
+  // Tray support varies by desktop environment
+  try {
+    const tray = new Tray({ /* ... */ });
+  } catch (error) {
+    console.log("Tray not supported on this desktop environment");
+  }
+}
+```
+
+### XDG Directories
+
+Linux follows XDG Base Directory specification:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Respects XDG_DATA_HOME, XDG_CONFIG_HOME, etc.
+console.log(Utils.paths.userData);   // ~/.local/share/app/channel
+console.log(Utils.paths.userCache);  // ~/.cache/app/channel
+console.log(Utils.paths.config);     // ~/.config
+```
+
+### Application Launcher
+
+Linux apps are packaged as directory bundles:
+
+```bash
+app/
+├── bin/
+│   ├── launcher      # Main executable
+│   └── bun          # Bun runtime
+└── Resources/
+    └── views/       # Your app files
+```
+
+## Renderer Detection
+
+Choose renderers based on platform:
+
+```typescript
+import { OS } from "electrobun/shared";
+import { BrowserWindow } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  // Use native WebKit on macOS, CEF elsewhere
+  renderer: OS === "macos" ? "native" : "cef",
+});
+```
+
+<Tabs>
+  <Tab title="native">
+    - **macOS**: WKWebView (Safari engine)
+    - **Windows/Linux**: Not available
+    - Smaller app size, better integration
+  </Tab>
+  
+  <Tab title="cef">
+    - **All platforms**: Chromium Embedded Framework
+    - Consistent rendering across platforms
+    - Larger app size
+  </Tab>
+</Tabs>
+
+## Cross-Platform Paths
+
+Use `Utils.paths` for cross-platform path handling:
+
+```typescript
+import { Utils } from "electrobun/bun";
+import { join } from "path";
+
+// Good: Cross-platform
+const dbPath = join(Utils.paths.userData, "database.db");
+
+// Bad: macOS-only
+const dbPath = "/Users/me/Library/Application Support/MyApp/database.db";
+```
+
+### Path Comparison
+
+<Tabs>
+  <Tab title="macOS">
+    ```typescript
+    Utils.paths.home         // /Users/username
+    Utils.paths.userData     // ~/Library/Application Support/com.myapp/channel
+    Utils.paths.documents    // ~/Documents
+    Utils.paths.downloads    // ~/Downloads
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    ```typescript
+    Utils.paths.home         // C:\Users\username
+    Utils.paths.userData     // C:\Users\username\AppData\Local\com.myapp\channel
+    Utils.paths.documents    // C:\Users\username\Documents
+    Utils.paths.downloads    // C:\Users\username\Downloads
+    ```
+  </Tab>
+
+  <Tab title="Linux">
+    ```typescript
+    Utils.paths.home         // /home/username
+    Utils.paths.userData     // ~/.local/share/com.myapp/channel
+    Utils.paths.documents    // ~/Documents (or XDG_DOCUMENTS_DIR)
+    Utils.paths.downloads    // ~/Downloads (or XDG_DOWNLOAD_DIR)
+    ```
+  </Tab>
+</Tabs>
+
+## Keyboard Shortcuts
+
+Use `CmdOrCtrl` for cross-platform shortcuts:
+
+```typescript
+import { ApplicationMenu } from "electrobun/bun";
+
+ApplicationMenu.setApplicationMenu([
+  {
+    label: "File",
+    submenu: [
+      {
+        label: "Save",
+        action: "save",
+        accelerator: "CmdOrCtrl+S",  // Cmd+S on macOS, Ctrl+S elsewhere
+      },
+      {
+        label: "Quit",
+        action: "quit",
+        accelerator: "CmdOrCtrl+Q",
+      },
+    ],
+  },
+]);
+```
+
+## Platform-Specific UI
+
+Adjust UI based on platform:
+
+```typescript src/mainview/index.ts
+import { OS } from "electrobun/shared";
+
+if (OS === "macos") {
+  // macOS: Traffic lights in top-left
+  document.body.style.paddingTop = "32px";
+} else if (OS === "win") {
+  // Windows: Title bar at top
+  document.body.style.paddingTop = "0";
+}
+```
+
+## Complete Platform Example
+
+Here's a complete example handling all platforms:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, ApplicationMenu, Tray, Utils } from "electrobun/bun";
+import { OS } from "electrobun/shared";
+
+const mainWindow = new BrowserWindow({
+  title: "Cross-Platform App",
+  url: "views://mainview/index.html",
+  titleBarStyle: OS === "macos" ? "hiddenInset" : "default",
+  renderer: OS === "macos" ? "native" : "cef",
+  frame: {
+    width: 1200,
+    height: OS === "win" ? 850 : 800,
+    x: 100,
+    y: 100,
+  },
+});
+
+// Platform-specific menu
+const menu = [
+  ...(OS === "macos"
+    ? [
+        {
+          label: "MyApp",
+          submenu: [
+            { label: "About MyApp", action: "about" },
+            { type: "divider" },
+            { label: "Quit", role: "quit" },
+          ],
+        },
+      ]
+    : []),
+  {
+    label: "File",
+    submenu: [
+      { label: "New", action: "new", accelerator: "CmdOrCtrl+N" },
+      { label: "Open", action: "open", accelerator: "CmdOrCtrl+O" },
+      ...(OS !== "macos"
+        ? [
+            { type: "divider" },
+            { label: "Exit", action: "quit", accelerator: "Alt+F4" },
+          ]
+        : []),
+    ],
+  },
+];
+
+ApplicationMenu.setApplicationMenu(menu);
+
+// Tray (try/catch for Linux desktop environments)
+try {
+  const tray = new Tray({
+    title: OS === "macos" ? "⚡" : undefined,
+    image: OS !== "macos" ? "views://assets/tray.png" : undefined,
+    template: OS === "macos",
+  });
+
+  tray.setMenu([
+    { label: "Show", action: "show" },
+    { label: OS === "macos" ? "Quit" : "Exit", action: "quit" },
+  ]);
+
+  tray.on("tray-clicked", (event) => {
+    if (event.data.action === "show") {
+      mainWindow.show();
+    } else if (event.data.action === "quit") {
+      Utils.quit();
+    }
+  });
+} catch (error) {
+  console.log("Tray not available on this platform");
+}
+
+// Platform-specific startup behavior
+if (OS === "macos") {
+  // macOS: Hide dock icon for background apps
+  // app.dock.hide(); (coming soon)
+}
+
+mainWindow.on("close", () => {
+  Utils.quit();
+});
+```
+
+## Testing Across Platforms
+
+<Steps>
+  <Step title="Test on each platform">
+    Build and test your app on macOS, Windows, and Linux:
+
+    ```bash
+    # macOS
+    bun electrobun build
+
+    # Windows (on Windows or via CI)
+    bun electrobun build --target win-x64
+
+    # Linux (on Linux or via CI)
+    bun electrobun build --target linux-x64
+    ```
+  </Step>
+
+  <Step title="Use virtual machines">
+    Use VMs or cloud services to test platforms you don't have:
+    - **macOS**: macOS on Mac hardware only
+    - **Windows**: VirtualBox, Parallels, or Azure
+    - **Linux**: VirtualBox, Docker, or DigitalOcean
+  </Step>
+
+  <Step title="Automate CI/CD">
+    Use GitHub Actions for multi-platform testing:
+
+    ```yaml .github/workflows/build.yml
+    name: Build
+    on: [push]
+    jobs:
+      build:
+        strategy:
+          matrix:
+            os: [macos-latest, windows-latest, ubuntu-latest]
+        runs-on: ${{ matrix.os }}
+        steps:
+          - uses: actions/checkout@v3
+          - uses: oven-sh/setup-bun@v1
+          - run: bun install
+          - run: bun electrobun build
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use OS detection sparingly">
+    Only branch on platform when necessary:
+
+    ```typescript
+    // Good: Uses cross-platform API
+    const path = Utils.paths.userData;
+
+    // Bad: Manual platform handling
+    const path = OS === "macos" 
+      ? "/Users/me/Library/Application Support/app"
+      : "C:\\Users\\me\\AppData\\Local\\app";
+    ```
+  </Accordion>
+
+  <Accordion title="Test on all platforms">
+    Always test platform-specific code on the target platform.
+  </Accordion>
+
+  <Accordion title="Use CmdOrCtrl">
+    Use `CmdOrCtrl` for keyboard shortcuts instead of hard-coding `Cmd` or `Ctrl`.
+  </Accordion>
+
+  <Accordion title="Handle graceful degradation">
+    Some features may not work on all platforms:
+
+    ```typescript
+    try {
+      const tray = new Tray({ /* ... */ });
+    } catch (error) {
+      console.log("Tray not supported, continuing without it");
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Building & Distributing" icon="box" href="/distribution/packaging">
+    Build for multiple platforms
+  </Card>
+  <Card title="Native Integrations" icon="laptop-code" href="/guides/native-integrations">
+    Use platform-native features
+  </Card>
+</CardGroup>

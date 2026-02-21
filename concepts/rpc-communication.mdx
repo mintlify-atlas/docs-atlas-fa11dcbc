@@ -1,0 +1,612 @@
+---
+title: RPC Communication
+description: Master type-safe communication between main process and webview processes using Electrobun's RPC system
+---
+
+# RPC Communication
+
+Electrobun provides a powerful, **type-safe RPC (Remote Procedure Call)** system for communication between the main process (Bun) and webview processes. This system enables you to call functions across process boundaries as if they were local functions.
+
+## Why RPC?
+
+The main process and webview processes run in separate, isolated environments for security and stability. RPC provides:
+
+- **Type-safe** communication with full TypeScript support
+- **Bidirectional** requests and messages
+- **Encrypted** communication using AES-GCM
+- **Promise-based** API for async operations
+- **Schema-driven** with compile-time type checking
+
+<Info>
+Unlike Electron's IPC, Electrobun's RPC is fully type-safe with automatic TypeScript inference and encryption by default.
+</Info>
+
+## RPC Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│  Main Process (Bun)         Webview Process (Browser)  │
+│  ┌─────────────────┐        ┌─────────────────┐        │
+│  │  RPC Handlers   │        │  RPC Handlers   │        │
+│  │  ┌───────────┐  │        │  ┌───────────┐  │        │
+│  │  │ requests  │  │        │  │ requests  │  │        │
+│  │  │ messages  │  │        │  │ messages  │  │        │
+│  │  └───────────┘  │        │  └───────────┘  │        │
+│  └────────┬────────┘        └────────┬────────┘        │
+│           │                          │                  │
+│           │  ◄── Encrypted RPC ──►   │                  │
+│           │     (AES-GCM over        │                  │
+│           │      WebSocket)          │                  │
+│           │                          │                  │
+└───────────┴──────────────────────────┴──────────────────┘
+```
+
+## Defining RPC Schema
+
+First, define your RPC schema with TypeScript types:
+
+```typescript title="src/shared/rpc-schema.ts"
+import type { ElectrobunRPCSchema } from "electrobun";
+
+// Define the schema for communication between Bun and Webview
+export interface MyRPCSchema extends ElectrobunRPCSchema {
+  // Main process (Bun) handlers
+  bun: {
+    requests: {
+      // Request-response pattern (async)
+      saveFile: {
+        params: { path: string; content: string };
+        response: { success: boolean; bytesWritten: number };
+      };
+      loadFile: {
+        params: { path: string };
+        response: { content: string };
+      };
+      getUserData: {
+        params: { userId: number };
+        response: { id: number; name: string; email: string };
+      };
+    };
+    messages: {
+      // Fire-and-forget pattern (no response)
+      logMessage: { level: string; message: string };
+      trackEvent: { event: string; properties: Record<string, any> };
+    };
+  };
+  
+  // Webview process handlers
+  webview: {
+    requests: {
+      updateUI: {
+        params: { title: string; content: string };
+        response: void;
+      };
+    };
+    messages: {
+      showNotification: { title: string; body: string };
+      updateProgress: { percent: number };
+    };
+  };
+}
+```
+
+<Note>
+**Requests** expect a response and return a Promise. **Messages** are fire-and-forget with no response.
+</Note>
+
+## Implementing RPC in Main Process
+
+```typescript title="src/bun/index.ts"
+import { BrowserWindow, BrowserView } from "electrobun/bun";
+import type { MyRPCSchema } from "../shared/rpc-schema";
+
+// Define RPC handlers for main process
+const rpc = BrowserView.defineRPC<MyRPCSchema>({
+  handlers: {
+    // Handle requests from webview
+    requests: {
+      saveFile: async ({ path, content }) => {
+        console.log(`Saving file: ${path}`);
+        
+        try {
+          await Bun.write(path, content);
+          const stats = await Bun.file(path).stat();
+          
+          return {
+            success: true,
+            bytesWritten: stats.size,
+          };
+        } catch (error) {
+          console.error("Save failed:", error);
+          return {
+            success: false,
+            bytesWritten: 0,
+          };
+        }
+      },
+      
+      loadFile: async ({ path }) => {
+        const content = await Bun.file(path).text();
+        return { content };
+      },
+      
+      getUserData: async ({ userId }) => {
+        // Fetch from database, API, etc.
+        return {
+          id: userId,
+          name: "John Doe",
+          email: "john@example.com",
+        };
+      },
+    },
+    
+    // Handle messages from webview
+    messages: {
+      logMessage: ({ level, message }) => {
+        console.log(`[${level}] ${message}`);
+      },
+      
+      trackEvent: ({ event, properties }) => {
+        console.log(`Event: ${event}`, properties);
+        // Send to analytics service
+      },
+    },
+  },
+});
+
+// Create window with RPC
+const mainWindow = new BrowserWindow({
+  title: "My App",
+  url: "views://mainview/index.html",
+  frame: { width: 1024, height: 768, x: 100, y: 100 },
+  rpc, // Attach RPC to window
+});
+
+// Send requests to webview
+await mainWindow.webview.rpc.request.updateUI({
+  title: "Welcome",
+  content: "Hello from main process!",
+});
+
+// Send messages to webview
+mainWindow.webview.rpc.send.showNotification({
+  title: "Update Available",
+  body: "A new version is ready to install",
+});
+```
+
+## Implementing RPC in Webview
+
+```typescript title="src/mainview/index.ts"
+import { Electroview } from "electrobun/browser";
+import type { MyRPCSchema } from "../shared/rpc-schema";
+
+// Define RPC handlers for webview
+const rpc = Electroview.defineRPC<MyRPCSchema>({
+  handlers: {
+    // Handle requests from main process
+    requests: {
+      updateUI: ({ title, content }) => {
+        document.title = title;
+        document.getElementById("content")!.textContent = content;
+      },
+    },
+    
+    // Handle messages from main process
+    messages: {
+      showNotification: ({ title, body }) => {
+        // Show in-app notification
+        const notification = document.createElement("div");
+        notification.className = "notification";
+        notification.innerHTML = `<strong>${title}</strong><p>${body}</p>`;
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.remove(), 5000);
+      },
+      
+      updateProgress: ({ percent }) => {
+        const progressBar = document.getElementById("progress") as HTMLProgressElement;
+        if (progressBar) {
+          progressBar.value = percent;
+        }
+      },
+    },
+  },
+});
+
+// Initialize Electroview with RPC
+const view = new Electroview({ rpc });
+
+// Call main process requests
+document.getElementById("saveBtn")?.addEventListener("click", async () => {
+  const result = await view.rpc.request.saveFile({
+    path: "/path/to/file.txt",
+    content: "Hello World",
+  });
+  
+  if (result.success) {
+    console.log(`Saved ${result.bytesWritten} bytes`);
+  }
+});
+
+// Load data from main process
+const userData = await view.rpc.request.getUserData({ userId: 123 });
+console.log("User:", userData.name, userData.email);
+
+// Send messages to main process (fire-and-forget)
+view.rpc.send.logMessage({
+  level: "info",
+  message: "User clicked save button",
+});
+
+view.rpc.send.trackEvent({
+  event: "button_click",
+  properties: { buttonId: "saveBtn" },
+});
+```
+
+## Request vs Message Patterns
+
+### Requests (Request-Response)
+
+Use requests when you need a response:
+
+```typescript
+// Main process
+requests: {
+  fetchData: async ({ id }) => {
+    const data = await database.get(id);
+    return data; // Must return a value
+  },
+}
+
+// Webview
+const data = await view.rpc.request.fetchData({ id: 123 });
+console.log(data); // Response from main process
+```
+
+### Messages (Fire-and-Forget)
+
+Use messages when you don't need a response:
+
+```typescript
+// Main process
+messages: {
+  logEvent: ({ event }) => {
+    console.log("Event:", event);
+    // No return value
+  },
+}
+
+// Webview
+view.rpc.send.logEvent({ event: "user_action" });
+// Continues immediately without waiting
+```
+
+<Tip>
+Use **requests** for data fetching and operations that can fail. Use **messages** for logging, analytics, and notifications.
+</Tip>
+
+## Advanced Patterns
+
+### Streaming Data
+
+Send multiple updates using messages:
+
+```typescript
+// Main process - send progress updates
+async function processLargeFile(filePath: string, webview: BrowserView) {
+  const totalSize = (await Bun.file(filePath).stat()).size;
+  let processed = 0;
+  
+  // Process in chunks
+  const file = Bun.file(filePath);
+  const stream = file.stream();
+  
+  for await (const chunk of stream) {
+    // Process chunk...
+    processed += chunk.length;
+    
+    // Send progress update
+    webview.rpc.send.updateProgress({
+      percent: (processed / totalSize) * 100,
+    });
+  }
+}
+
+// Webview - receive updates
+messages: {
+  updateProgress: ({ percent }) => {
+    progressBar.value = percent;
+    progressText.textContent = `${percent.toFixed(0)}%`;
+  },
+}
+```
+
+### Error Handling
+
+```typescript
+// Main process - throw errors
+requests: {
+  saveFile: async ({ path, content }) => {
+    if (!path) {
+      throw new Error("Path is required");
+    }
+    
+    if (path.startsWith("/system")) {
+      throw new Error("Cannot write to system directory");
+    }
+    
+    await Bun.write(path, content);
+    return { success: true };
+  },
+}
+
+// Webview - catch errors
+try {
+  await view.rpc.request.saveFile({ path: "", content: "test" });
+} catch (error) {
+  console.error("Save failed:", error.message);
+  alert(`Error: ${error.message}`);
+}
+```
+
+### Wildcard Message Handlers
+
+Listen to all messages:
+
+```typescript
+const rpc = BrowserView.defineRPC<MyRPCSchema>({
+  handlers: {
+    messages: {
+      // Handle all messages
+      "*": (messageName, payload) => {
+        console.log(`Message received: ${messageName}`, payload);
+      },
+      
+      // Specific handlers still work
+      logMessage: ({ level, message }) => {
+        console.log(`[${level}] ${message}`);
+      },
+    },
+  },
+});
+```
+
+### Custom Transport
+
+Advanced: Create a custom RPC transport:
+
+```typescript
+import { createRPC } from "electrobun";
+
+const customRPC = createRPC({
+  transport: {
+    send: (message) => {
+      // Custom send logic
+      console.log("Sending:", message);
+    },
+    registerHandler: (handler) => {
+      // Custom receive logic
+      window.addEventListener("message", (event) => {
+        handler(event.data);
+      });
+    },
+  },
+  requestHandler: {
+    myMethod: ({ param }) => {
+      return { result: "value" };
+    },
+  },
+});
+```
+
+## RPC Options
+
+### Timeout Configuration
+
+```typescript
+const rpc = BrowserView.defineRPC<MyRPCSchema>({
+  maxRequestTime: 5000, // 5 seconds (default: 1000ms)
+  handlers: {
+    requests: {
+      longRunningTask: async () => {
+        // This has 5 seconds to complete
+        await longOperation();
+        return { done: true };
+      },
+    },
+  },
+});
+```
+
+### Dynamic Handler Registration
+
+```typescript
+const rpc = BrowserView.defineRPC<MyRPCSchema>({
+  handlers: {
+    requests: {
+      // Fallback handler for unknown methods
+      _: (method, params) => {
+        console.log(`Unknown method: ${method}`, params);
+        throw new Error(`Method not found: ${method}`);
+      },
+    },
+  },
+});
+```
+
+## Security Considerations
+
+### 1. Validate Input
+
+```typescript
+// ✅ Good: Validate all input
+requests: {
+  saveFile: async ({ path, content }) => {
+    // Validate path
+    if (typeof path !== "string" || path.length === 0) {
+      throw new Error("Invalid path");
+    }
+    
+    // Sanitize path (prevent directory traversal)
+    const safePath = path.replace(/\.\./g, "");
+    
+    // Validate content
+    if (typeof content !== "string") {
+      throw new Error("Invalid content");
+    }
+    
+    await Bun.write(safePath, content);
+    return { success: true };
+  },
+}
+
+// ❌ Bad: Trust input blindly
+requests: {
+  saveFile: async ({ path, content }) => {
+    await Bun.write(path, content); // Dangerous!
+  },
+}
+```
+
+### 2. Use Sandbox Mode for Untrusted Content
+
+```typescript
+// For external/untrusted content
+const untrustedView = new BrowserWindow({
+  url: "https://third-party-site.com",
+  sandbox: true, // Disables RPC completely
+});
+
+// For semi-trusted content
+const semiTrustedView = new BrowserWindow({
+  url: "https://partner-site.com",
+  sandbox: false,
+  navigationRules: JSON.stringify([
+    { type: "allow", pattern: "https://partner-site.com/*" },
+    { type: "deny", pattern: "*" },
+  ]),
+  rpc: limitedRPC, // Provide limited RPC with restricted handlers
+});
+```
+
+### 3. Principle of Least Privilege
+
+```typescript
+// ✅ Good: Only expose what's needed
+const publicViewRPC = BrowserView.defineRPC<PublicRPCSchema>({
+  handlers: {
+    requests: {
+      // Only allow safe operations
+      getPublicData: async () => { /* ... */ },
+    },
+  },
+});
+
+// ❌ Bad: Exposing too much
+const dangerousRPC = BrowserView.defineRPC<DangerousRPCSchema>({
+  handlers: {
+    requests: {
+      executeCommand: async ({ cmd }) => {
+        // DON'T DO THIS!
+        return await Bun.$`${cmd}`.text();
+      },
+    },
+  },
+});
+```
+
+## Performance Tips
+
+### 1. Batch Operations
+
+```typescript
+// ✅ Good: Batch multiple operations
+requests: {
+  saveMultipleFiles: async ({ files }) => {
+    const results = await Promise.all(
+      files.map(({ path, content }) => Bun.write(path, content))
+    );
+    return { saved: results.length };
+  },
+}
+
+// ❌ Bad: Multiple individual calls
+for (const file of files) {
+  await view.rpc.request.saveFile(file); // Slow!
+}
+```
+
+### 2. Use Messages for One-Way Communication
+
+```typescript
+// ✅ Good: Fire-and-forget for logging
+view.rpc.send.logMessage({ level: "info", message: "Action performed" });
+
+// ❌ Bad: Unnecessary request for logging
+await view.rpc.request.logMessage({ level: "info", message: "Action performed" });
+```
+
+### 3. Avoid Large Payloads
+
+```typescript
+// ✅ Good: Stream large data
+requests: {
+  getLargeDataChunk: async ({ offset, limit }) => {
+    return await fetchDataChunk(offset, limit);
+  },
+}
+
+// ❌ Bad: Send huge payload at once
+requests: {
+  getAllData: async () => {
+    return await fetchAllData(); // Could be gigabytes!
+  },
+}
+```
+
+## Debugging RPC
+
+### Enable Debug Logging
+
+```typescript
+const rpc = createRPC({
+  _debugHooks: {
+    onSend: (packet) => {
+      console.log("→ Sending:", packet);
+    },
+    onReceive: (packet) => {
+      console.log("← Received:", packet);
+    },
+  },
+  // ... other config
+});
+```
+
+### Monitor RPC Traffic
+
+```typescript
+// Log all RPC calls
+const originalSend = view.rpc.send;
+view.rpc.send = new Proxy(originalSend, {
+  get: (target, method) => {
+    return (...args: any[]) => {
+      console.log(`RPC send: ${String(method)}`, args);
+      return (target as any)[method](...args);
+    };
+  },
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Main Process" icon="server" href="/concepts/main-process">
+    Learn about main process APIs
+  </Card>
+  <Card title="Webview Process" icon="window" href="/concepts/webview-process">
+    Master webview creation and management
+  </Card>
+</CardGroup>

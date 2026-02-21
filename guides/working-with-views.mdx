@@ -1,0 +1,393 @@
+---
+title: Working with Views
+description: Learn how to create and manage BrowserViews in Electrobun
+---
+
+## Overview
+
+BrowserViews are embedded web content containers that can be attached to windows or used independently. They provide fine-grained control over web content rendering and are ideal for building tabbed interfaces or multi-panel layouts.
+
+## BrowserView vs BrowserWindow
+
+- **BrowserWindow**: Creates a native window container that includes a BrowserView
+- **BrowserView**: Just the web content, can be embedded or detached
+
+<Note>
+Every BrowserWindow automatically creates a BrowserView accessible via `window.webview`.
+</Note>
+
+## Creating a BrowserView
+
+<Steps>
+  <Step title="Import BrowserView">
+    ```typescript
+    import { BrowserView } from "electrobun/bun";
+    ```
+  </Step>
+
+  <Step title="Create a view">
+    ```typescript
+    const view = new BrowserView({
+      url: "views://content/index.html",
+      frame: {
+        x: 0,
+        y: 0,
+        width: 800,
+        height: 600,
+      },
+      renderer: "native",
+    });
+    ```
+  </Step>
+</Steps>
+
+## View Options
+
+### Basic Configuration
+
+```typescript
+const view = new BrowserView({
+  url: "views://content/index.html",   // Content URL
+  html: null,                          // Or raw HTML
+  preload: null,                       // Preload script path
+  renderer: "native",                  // "native" or "cef"
+  frame: {
+    x: 0,
+    y: 0,
+    width: 800,
+    height: 600,
+  },
+});
+```
+
+### Attaching to a Window
+
+Attach a view to a specific window:
+
+```typescript
+import { BrowserWindow, BrowserView } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  title: "Container",
+  frame: { width: 1200, height: 800, x: 0, y: 0 },
+});
+
+// Create a view attached to the window
+const sidebarView = new BrowserView({
+  url: "views://sidebar/index.html",
+  windowId: window.id,
+  frame: {
+    x: 0,
+    y: 0,
+    width: 300,
+    height: 800,
+  },
+  autoResize: false,
+});
+```
+
+### Auto-Resize Behavior
+
+Control whether views resize with their window:
+
+```typescript
+const view = new BrowserView({
+  windowId: window.id,
+  autoResize: true,   // Resize with window
+});
+```
+
+## Loading Content
+
+### Load URL
+
+```typescript
+const view = new BrowserView({ /* ... */ });
+
+// Load a URL
+view.loadURL("https://electrobun.dev");
+
+// Load from views folder
+view.loadURL("views://page/index.html");
+```
+
+### Load HTML
+
+```typescript
+view.loadHTML(`
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>Dynamic Content</title>
+    </head>
+    <body>
+      <h1>Hello from HTML!</h1>
+    </body>
+  </html>
+`);
+```
+
+## View Lifecycle Events
+
+Listen to navigation and load events:
+
+```typescript
+view.on("will-navigate", (event) => {
+  console.log("About to navigate to:", event.data.url);
+});
+
+view.on("did-navigate", (event) => {
+  console.log("Navigated to:", event.data.url);
+});
+
+view.on("did-navigate-in-page", (event) => {
+  console.log("In-page navigation:", event.data.url);
+});
+
+view.on("dom-ready", (event) => {
+  console.log("DOM is ready");
+});
+```
+
+## JavaScript Execution
+
+Execute JavaScript in the view's context:
+
+```typescript
+view.executeJavascript(`
+  document.body.style.backgroundColor = 'lightblue';
+  console.log('Background changed!');
+`);
+```
+
+<Warning>
+`executeJavascript` runs without waiting for a return value. For two-way communication, use RPC instead.
+</Warning>
+
+## Developer Tools
+
+Open and manage DevTools:
+
+```typescript
+// Open DevTools
+view.openDevTools();
+
+// Close DevTools
+view.closeDevTools();
+
+// Toggle DevTools
+view.toggleDevTools();
+```
+
+## Find in Page
+
+Implement search functionality:
+
+```typescript
+// Start searching
+view.findInPage("search term", {
+  forward: true,
+  matchCase: false,
+});
+
+// Stop searching
+view.stopFindInPage();
+```
+
+## Navigation Rules
+
+Control which URLs the view can navigate to:
+
+```typescript
+const view = new BrowserView({
+  url: "views://start/index.html",
+});
+
+// Set navigation rules after creation
+view.setNavigationRules([
+  { action: "allow", pattern: "https://electrobun.dev/*" },
+  { action: "allow", pattern: "views://*" },
+  { action: "deny", pattern: "*" },
+]);
+```
+
+## Sandbox Mode
+
+For untrusted content, enable sandbox mode:
+
+```typescript
+const untrustedView = new BrowserView({
+  url: "https://external-site.com",
+  sandbox: true,  // Disables RPC, only events work
+});
+```
+
+<Warning>
+Always use sandbox mode for external or user-provided URLs.
+</Warning>
+
+## Partitions
+
+Isolate storage and cookies using partitions:
+
+```typescript
+const view1 = new BrowserView({
+  partition: "session-a",  // Separate storage
+});
+
+const view2 = new BrowserView({
+  partition: "session-b",  // Different storage
+});
+```
+
+## Transparency and Passthrough
+
+Control view rendering behavior:
+
+```typescript
+const view = new BrowserView({
+  startTransparent: true,    // Start with transparent background
+  startPassthrough: false,   // Mouse events pass through
+});
+```
+
+## Multi-Tab Example
+
+Here's how to build a tabbed interface:
+
+```typescript src/bun/tabManager.ts
+import { BrowserWindow, BrowserView } from "electrobun/bun";
+
+const tabs = new Map<string, BrowserView>();
+let activeTabId: string | null = null;
+
+const mainWindow = new BrowserWindow({
+  title: "Tabbed Browser",
+  frame: { width: 1200, height: 800, x: 100, y: 100 },
+});
+
+export function createTab(url: string): string {
+  const tabId = `tab-${Date.now()}`;
+  
+  const view = new BrowserView({
+    url,
+    windowId: mainWindow.id,
+    frame: {
+      x: 0,
+      y: 40,  // Below tab bar
+      width: 1200,
+      height: 760,
+    },
+    autoResize: true,
+  });
+  
+  tabs.set(tabId, view);
+  switchToTab(tabId);
+  
+  return tabId;
+}
+
+export function switchToTab(tabId: string): void {
+  // Hide all tabs
+  tabs.forEach((view, id) => {
+    if (id !== tabId) {
+      view.executeJavascript('document.body.style.display = "none"');
+    }
+  });
+  
+  // Show selected tab
+  const view = tabs.get(tabId);
+  if (view) {
+    view.executeJavascript('document.body.style.display = "block"');
+    activeTabId = tabId;
+  }
+}
+
+export function closeTab(tabId: string): void {
+  tabs.delete(tabId);
+  
+  if (activeTabId === tabId && tabs.size > 0) {
+    const nextTab = Array.from(tabs.keys())[0];
+    switchToTab(nextTab);
+  }
+}
+```
+
+## Managing Multiple Views
+
+Access and manage all views:
+
+```typescript
+import { BrowserView } from "electrobun/bun";
+
+// Get view by ID
+const view = BrowserView.getById(viewId);
+
+// Get all views
+const allViews = BrowserView.getAll();
+console.log(`Total views: ${allViews.length}`);
+```
+
+## Download Events
+
+Handle file downloads:
+
+```typescript
+view.on("download-started", (event) => {
+  console.log("Download started:", event.data);
+});
+
+view.on("download-progress", (event) => {
+  console.log("Progress:", event.data.percent);
+});
+
+view.on("download-completed", (event) => {
+  console.log("Download complete:", event.data.path);
+});
+
+view.on("download-failed", (event) => {
+  console.error("Download failed:", event.data.error);
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use sandbox for external content">
+    Always enable sandbox mode when loading URLs you don't control:
+    
+    ```typescript
+    const externalView = new BrowserView({
+      url: "https://user-provided-url.com",
+      sandbox: true,
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Set navigation rules">
+    Prevent navigation to unexpected URLs:
+    
+    ```typescript
+    view.setNavigationRules([
+      { action: "allow", pattern: "views://*" },
+      { action: "allow", pattern: "https://yourdomain.com/*" },
+      { action: "deny", pattern: "*" },
+    ]);
+    ```
+  </Accordion>
+
+  <Accordion title="Clean up views when done">
+    Views are automatically cleaned up when their window closes, but you can manually manage them for better resource control.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Inter-Process Communication" icon="arrows-left-right" href="/guides/inter-process-communication">
+    Set up RPC between Bun and views
+  </Card>
+  <Card title="Creating Windows" icon="window" href="/guides/creating-windows">
+    Learn about window management
+  </Card>
+</CardGroup>

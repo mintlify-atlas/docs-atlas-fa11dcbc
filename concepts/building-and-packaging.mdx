@@ -1,0 +1,608 @@
+---
+title: Building and Packaging
+description: Learn how to build, package, and distribute your Electrobun applications across platforms
+---
+
+# Building and Packaging
+
+Electrobun provides an integrated build and packaging system that creates **self-extracting executables** with tiny update packages. This guide covers the complete build pipeline from development to distribution.
+
+## Build Configuration
+
+Your build is configured in `electrobun.config.ts`:
+
+```typescript title="electrobun.config.ts"
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "my-app",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  
+  build: {
+    // Define webview bundles
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+      settings: {
+        entrypoint: "src/settings/index.ts",
+      },
+    },
+    
+    // Copy static assets
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+      "src/mainview/index.css": "views/mainview/index.css",
+      "src/settings/index.html": "views/settings/index.html",
+      "assets/icon.png": "assets/icon.png",
+    },
+    
+    // Platform-specific options
+    mac: {
+      bundleCEF: false,  // Use native WebKit
+      icon: "assets/icon.icns",
+      category: "public.app-category.productivity",
+      target: "dmg",     // or "pkg", "zip"
+    },
+    
+    win: {
+      bundleCEF: false,  // Use native WebView2
+      icon: "assets/icon.ico",
+      target: "nsis",    // or "portable", "msi"
+    },
+    
+    linux: {
+      bundleCEF: false,  // Use native WebKitGTK
+      icon: "assets/icon.png",
+      target: "AppImage", // or "deb", "rpm"
+    },
+  },
+  
+  runtime: {
+    // Runtime behavior
+    exitOnLastWindowClosed: true,
+    defaultRenderer: "native", // or "cef"
+  },
+} satisfies ElectrobunConfig;
+```
+
+## Development Mode
+
+### Running in Dev Mode
+
+```bash
+# Start development build with hot reload
+bun dev
+
+# Or use npm/yarn
+npm run dev
+yarn dev
+```
+
+Development mode:
+- Builds your code with source maps
+- Enables hot reload for fast iteration
+- Opens DevTools automatically (optional)
+- Uses uncompressed assets for debugging
+
+### Project Structure
+
+```
+my-electrobun-app/
+├── electrobun.config.ts     # Build configuration
+├── package.json
+├── tsconfig.json
+├── src/
+│   ├── bun/                 # Main process code
+│   │   └── index.ts         # Main process entry
+│   ├── mainview/            # Main webview
+│   │   ├── index.html
+│   │   ├── index.ts
+│   │   └── index.css
+│   ├── settings/            # Settings webview
+│   │   ├── index.html
+│   │   └── index.ts
+│   └── shared/              # Shared code
+│       └── rpc-schema.ts    # RPC types
+├── assets/                  # Static assets
+│   ├── icon.png
+│   ├── icon.icns (macOS)
+│   └── icon.ico (Windows)
+└── dist/                    # Build output (auto-generated)
+```
+
+## Production Build
+
+### Building for Production
+
+```bash
+# Build for current platform
+bun run build
+
+# Build in release mode (optimized)
+bun run build --release
+
+# Build for specific platform
+bun run build --platform=mac
+bun run build --platform=win
+bun run build --platform=linux
+```
+
+### Build Output
+
+```
+dist/
+├── my-app-1.0.0-mac-x64.dmg        # macOS installer
+├── my-app-1.0.0-mac-arm64.dmg      # macOS Apple Silicon
+├── my-app-1.0.0-win-x64-setup.exe  # Windows installer
+├── my-app-1.0.0-linux-x64.AppImage # Linux AppImage
+└── updates/                         # Update packages
+    ├── 1.0.0-mac-x64.update
+    ├── 1.0.0-mac-arm64.update
+    ├── 1.0.0-win-x64.update
+    └── 1.0.0-linux-x64.update
+```
+
+<Info>
+Electrobun uses **bsdiff** to create tiny binary patches between versions, often reducing updates to just a few kilobytes.
+</Info>
+
+## Build Process Details
+
+### 1. TypeScript Compilation
+
+Electrobun uses Bun's bundler to compile your TypeScript:
+
+```typescript
+// Main process (runs in Bun)
+src/bun/index.ts → dist/bun.js
+
+// Webviews (run in browser)
+src/mainview/index.ts → dist/views/mainview/index.js
+src/settings/index.ts → dist/views/settings/index.js
+```
+
+### 2. Asset Processing
+
+Static assets are copied and optimized:
+
+```typescript
+// Copy configuration
+copy: {
+  "src/mainview/index.html": "views/mainview/index.html",
+  "assets/icon.png": "assets/icon.png",
+  "public/**/*": "public/",  // Glob patterns supported
+}
+```
+
+### 3. Native Binary Packaging
+
+Electrobun packages:
+- Bun runtime (~10MB)
+- Native launcher (Zig binary)
+- Your compiled code
+- Assets and resources
+- Optional: CEF framework (~100MB)
+
+### 4. Self-Extractor Creation
+
+The final executable is a self-extracting archive:
+
+```
+┌─────────────────────────────────────┐
+│  Launcher (Zig)                     │  ← Tiny executable
+├─────────────────────────────────────┤
+│  Compressed Archive (zstd)          │
+│  ├── Bun Runtime                    │
+│  ├── Your Code                      │
+│  ├── Assets                         │
+│  └── Native Bindings                │
+└─────────────────────────────────────┘
+```
+
+On first run:
+1. Launcher extracts archive to app data directory
+2. Verifies integrity
+3. Launches Bun runtime with your code
+
+## Platform-Specific Builds
+
+### macOS
+
+```typescript
+mac: {
+  // Use native WebKit (smaller) or CEF (consistent)
+  bundleCEF: false,
+  
+  // App icon (.icns format)
+  icon: "assets/icon.icns",
+  
+  // App category for App Store
+  category: "public.app-category.productivity",
+  
+  // Code signing
+  sign: {
+    identity: "Developer ID Application: Your Name (TEAM_ID)",
+    entitlements: "entitlements.plist",
+  },
+  
+  // Notarization (required for macOS 10.15+)
+  notarize: {
+    appleId: "your-apple-id@example.com",
+    appleIdPassword: "@keychain:AC_PASSWORD",
+    teamId: "TEAM_ID",
+  },
+  
+  // Build target
+  target: "dmg", // or "pkg", "zip", "mas" (Mac App Store)
+  
+  // Architecture
+  arch: ["x64", "arm64"], // Universal binary or specific
+}
+```
+
+#### Creating macOS Icon
+
+```bash
+# Create .icns from PNG
+mkdir icon.iconset
+sips -z 16 16     icon.png --out icon.iconset/icon_16x16.png
+sips -z 32 32     icon.png --out icon.iconset/icon_16x16@2x.png
+sips -z 32 32     icon.png --out icon.iconset/icon_32x32.png
+sips -z 64 64     icon.png --out icon.iconset/icon_32x32@2x.png
+sips -z 128 128   icon.png --out icon.iconset/icon_128x128.png
+sips -z 256 256   icon.png --out icon.iconset/icon_128x128@2x.png
+sips -z 256 256   icon.png --out icon.iconset/icon_256x256.png
+sips -z 512 512   icon.png --out icon.iconset/icon_256x256@2x.png
+sips -z 512 512   icon.png --out icon.iconset/icon_512x512.png
+sips -z 1024 1024 icon.png --out icon.iconset/icon_512x512@2x.png
+iconutil -c icns icon.iconset
+```
+
+### Windows
+
+```typescript
+win: {
+  // Use native WebView2 or CEF
+  bundleCEF: false,
+  
+  // App icon (.ico format)
+  icon: "assets/icon.ico",
+  
+  // Code signing
+  sign: {
+    certificateFile: "cert.pfx",
+    certificatePassword: "password",
+    timestampServer: "http://timestamp.digicert.com",
+  },
+  
+  // Build target
+  target: "nsis",    // NSIS installer (recommended)
+  // target: "portable", // Single .exe (no installation)
+  // target: "msi",      // MSI installer
+  
+  // Architecture
+  arch: "x64",       // or "ia32", "arm64"
+}
+```
+
+#### Creating Windows Icon
+
+```bash
+# Use ImageMagick or online converter
+convert icon.png -define icon:auto-resize=256,128,64,48,32,16 icon.ico
+```
+
+### Linux
+
+```typescript
+linux: {
+  // Use native WebKitGTK or CEF
+  bundleCEF: false,
+  
+  // App icon (.png format)
+  icon: "assets/icon.png",
+  
+  // Desktop entry
+  desktop: {
+    name: "My App",
+    genericName: "Productivity Tool",
+    categories: ["Utility", "Development"],
+    startupWMClass: "my-app",
+  },
+  
+  // Build target
+  target: "AppImage", // Recommended for distribution
+  // target: "deb",      // Debian/Ubuntu package
+  // target: "rpm",      // RedHat/Fedora package
+  // target: "snap",     // Snap package
+  
+  // Architecture
+  arch: "x64",       // or "arm64", "armv7l"
+}
+```
+
+## Native vs CEF Renderer
+
+### Native Webview (Default)
+
+**Pros:**
+- **Tiny app size**: ~12MB total
+- Uses system webview (always up-to-date)
+- Better performance and battery life
+- Faster startup time
+
+**Cons:**
+- Different rendering across platforms
+- Limited control over webview version
+- May have platform-specific quirks
+
+```typescript
+build: {
+  mac: { bundleCEF: false },
+  win: { bundleCEF: false },
+  linux: { bundleCEF: false },
+}
+```
+
+### CEF (Chromium Embedded Framework)
+
+**Pros:**
+- **Consistent rendering** across all platforms
+- Control exact Chromium version
+- Advanced features (extensions, PDF viewer)
+- Better debugging tools
+
+**Cons:**
+- Larger app size (~100MB additional)
+- Slower startup time
+- More memory usage
+
+```typescript
+build: {
+  mac: { bundleCEF: true },
+  win: { bundleCEF: true },
+  linux: { bundleCEF: true },
+}
+```
+
+<Tip>
+Use **native webview** for most apps. Switch to **CEF** only if you need consistent rendering or advanced Chromium features.
+</Tip>
+
+## Auto-Updates
+
+Electrobun includes a built-in updater using binary diffing:
+
+```typescript title="src/bun/index.ts"
+import { Updater } from "electrobun/bun";
+
+// Configure update server
+const updater = new Updater({
+  url: "https://updates.myapp.com",
+  channel: "stable", // or "beta", "canary"
+});
+
+// Check for updates
+const status = await updater.checkForUpdates();
+
+if (status.available) {
+  console.log("Update available:", status.version);
+  
+  // Download update
+  updater.on("download-progress", ({ percent }) => {
+    console.log(`Downloading: ${percent}%`);
+  });
+  
+  await updater.downloadUpdate();
+  
+  // Install on quit
+  updater.quitAndInstall();
+}
+```
+
+### Update Server
+
+Host your updates on any static file server:
+
+```
+https://updates.myapp.com/
+├── latest.json              # Version manifest
+├── updates/
+│   ├── 1.0.1-mac-x64.update
+│   ├── 1.0.1-win-x64.update
+│   └── 1.0.1-linux-x64.update
+└── installers/
+    ├── my-app-1.0.1-mac-x64.dmg
+    ├── my-app-1.0.1-win-x64-setup.exe
+    └── my-app-1.0.1-linux-x64.AppImage
+```
+
+```json title="latest.json"
+{
+  "version": "1.0.1",
+  "releaseDate": "2024-02-21",
+  "platforms": {
+    "darwin-x64": {
+      "url": "https://updates.myapp.com/updates/1.0.1-mac-x64.update",
+      "size": 45120,
+      "checksum": "sha256:abc123..."
+    },
+    "win32-x64": {
+      "url": "https://updates.myapp.com/updates/1.0.1-win-x64.update",
+      "size": 38400,
+      "checksum": "sha256:def456..."
+    },
+    "linux-x64": {
+      "url": "https://updates.myapp.com/updates/1.0.1-linux-x64.update",
+      "size": 42000,
+      "checksum": "sha256:ghi789..."
+    }
+  },
+  "releaseNotes": "Bug fixes and performance improvements"
+}
+```
+
+<Note>
+Update files are created automatically during build. They contain only binary differences (patches) from the previous version, making them extremely small.
+</Note>
+
+## Distribution
+
+### macOS Distribution
+
+1. **Direct Download**: Host `.dmg` on your website
+2. **App Store**: Build with `target: "mas"`
+3. **Homebrew**: Create a Homebrew cask
+
+```ruby title="my-app.rb"
+cask "my-app" do
+  version "1.0.0"
+  sha256 "abc123..."
+  
+  url "https://releases.myapp.com/my-app-#{version}-mac.dmg"
+  name "My App"
+  desc "My awesome app"
+  homepage "https://myapp.com"
+  
+  app "My App.app"
+end
+```
+
+### Windows Distribution
+
+1. **Direct Download**: Host `.exe` installer on your website
+2. **Microsoft Store**: Package as MSIX
+3. **Chocolatey**: Create a Chocolatey package
+4. **Winget**: Submit to winget repository
+
+### Linux Distribution
+
+1. **Direct Download**: Host `.AppImage`
+2. **Snap Store**: Build with `target: "snap"`
+3. **Flatpak**: Create Flatpak manifest
+4. **APT/YUM**: Build `.deb` or `.rpm` packages
+
+## Best Practices
+
+### 1. Version Management
+
+Use semantic versioning:
+
+```json title="package.json"
+{
+  "version": "1.2.3"
+}
+```
+
+```typescript title="electrobun.config.ts"
+import pkg from "./package.json";
+
+export default {
+  app: {
+    version: pkg.version, // Sync with package.json
+  },
+};
+```
+
+### 2. Environment-Specific Configs
+
+```typescript title="electrobun.config.ts"
+const isDev = process.env.NODE_ENV === "development";
+
+export default {
+  build: {
+    mac: {
+      bundleCEF: isDev ? false : true, // CEF only in production
+    },
+  },
+  runtime: {
+    defaultRenderer: isDev ? "native" : "cef",
+  },
+};
+```
+
+### 3. Asset Optimization
+
+```bash
+# Optimize images before building
+pngquant assets/*.png
+jpegoptim assets/*.jpg
+
+# Minify CSS/JS (Bun does this automatically)
+```
+
+### 4. Code Splitting
+
+```typescript
+// Load heavy modules lazily
+const loadHeavyModule = async () => {
+  const module = await import("./heavy-module");
+  return module.default;
+};
+```
+
+### 5. Testing Builds
+
+```bash
+# Test on each platform before release
+bun run build --platform=mac
+bun run build --platform=win
+bun run build --platform=linux
+
+# Test installers
+# macOS: Double-click .dmg
+# Windows: Run .exe
+# Linux: chmod +x *.AppImage && ./app.AppImage
+```
+
+## Troubleshooting
+
+### Build Fails
+
+```bash
+# Clean build cache
+rm -rf dist/
+rm -rf node_modules/.cache/
+
+# Rebuild
+bun install
+bun run build
+```
+
+### Large Bundle Size
+
+```bash
+# Analyze bundle
+bun run build --analyze
+
+# Check what's included
+du -sh dist/*
+
+# Remove unnecessary dependencies
+npm prune --production
+```
+
+### Update Issues
+
+```typescript
+// Enable update debugging
+const updater = new Updater({
+  url: "https://updates.myapp.com",
+  debug: true, // Log all update operations
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="diagram-project" href="/concepts/architecture">
+    Understand Electrobun's architecture
+  </Card>
+  <Card title="Main Process" icon="server" href="/concepts/main-process">
+    Learn about main process APIs
+  </Card>
+</CardGroup>

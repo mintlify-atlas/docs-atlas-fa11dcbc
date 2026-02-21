@@ -1,0 +1,240 @@
+---
+title: 'Socket'
+description: 'Low-level RPC socket interface'
+icon: 'plug'
+---
+
+The `Socket` module provides low-level access to the WebSocket-based RPC system used for communication between the main process and renderer processes.
+
+<Warning>
+  This is a low-level API. Most users should use the higher-level RPC system provided by `BrowserView.defineRPC()` instead.
+</Warning>
+
+## Overview
+
+Electrobun uses encrypted WebSocket connections for RPC communication between the main (Bun) process and renderer processes. The Socket module exposes the underlying server and connection management.
+
+## rpcServer
+
+The WebSocket server instance.
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+const server = Socket.rpcServer;
+console.log('RPC Server:', server.url.origin);
+```
+
+<ResponseField name="rpcServer" type="Server | null">
+  Bun WebSocket server instance, or null if server failed to start
+</ResponseField>
+
+## rpcPort
+
+The port number the RPC server is listening on.
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+console.log('RPC Port:', Socket.rpcPort);
+```
+
+<ResponseField name="rpcPort" type="number">
+  Port number (automatically selected from range 50000-65535)
+</ResponseField>
+
+## socketMap
+
+Map of active WebSocket connections by webview ID.
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+const connection = Socket.socketMap[webviewId];
+if (connection) {
+  console.log('Socket state:', connection.socket?.readyState);
+  console.log('Queued messages:', connection.queue.length);
+}
+```
+
+<ResponseField name="socketMap" type="object">
+  Map of webview IDs to connection objects
+  <Expandable title="Connection object">
+    <ResponseField name="socket" type="ServerWebSocket | null">
+      WebSocket connection (null if not connected)
+    </ResponseField>
+    <ResponseField name="queue" type="string[]">
+      Queue of messages waiting to be sent
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## sendMessageToWebviewViaSocket
+
+Send a message to a webview via its WebSocket connection.
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+const sent = Socket.sendMessageToWebviewViaSocket(webviewId, message);
+```
+
+<ParamField path="webviewId" type="number" required>
+  ID of the target webview
+</ParamField>
+
+<ParamField path="message" type="any" required>
+  Message to send (will be JSON serialized and encrypted)
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if message was sent via WebSocket, `false` if connection not available (caller should use fallback method)
+</ResponseField>
+
+## Security
+
+All messages sent through the WebSocket are encrypted using AES-256-GCM:
+
+1. Each webview has a unique 32-byte secret key
+2. Messages are encrypted with a random IV and authentication tag
+3. Only the webview with the matching secret key can decrypt messages
+4. This prevents malicious content from intercepting or injecting RPC messages
+
+## Architecture
+
+### Server Initialization
+
+The RPC server starts automatically when the Socket module is imported:
+
+- Attempts to bind to a port in the range 50000-65535
+- If a port is in use, tries the next one
+- Fails if all ports in range are occupied
+
+### Connection Flow
+
+1. Webview connects to `ws://localhost:{rpcPort}/socket?webviewId={id}`
+2. Server upgrades the connection and stores it in `socketMap`
+3. Messages are encrypted before sending
+4. Received messages are decrypted and passed to the webview's RPC handler
+
+### Fallback Mechanism
+
+If WebSocket connection is not available, the RPC system automatically falls back to:
+
+- JavaScript execution via `evaluateJavascript()` for sending to renderer
+- This is less efficient but ensures communication always works
+
+## Example Usage
+
+### Monitor Connection Status
+
+```typescript
+import { Socket, BrowserView } from 'electrobun/bun';
+
+function checkConnection(view: BrowserView) {
+  const connection = Socket.socketMap[view.id];
+  
+  if (connection?.socket) {
+    const state = connection.socket.readyState;
+    const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+    console.log(`View ${view.id} socket: ${states[state]}`);
+  } else {
+    console.log(`View ${view.id} has no socket connection`);
+  }
+}
+```
+
+### Debug Message Queue
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+function debugMessageQueue() {
+  Object.entries(Socket.socketMap).forEach(([id, connection]) => {
+    if (connection.queue.length > 0) {
+      console.log(`View ${id} has ${connection.queue.length} queued messages`);
+    }
+  });
+}
+```
+
+### Custom Transport
+
+For advanced use cases, you can build custom transports:
+
+```typescript
+import { Socket } from 'electrobun/bun';
+
+class CustomTransport {
+  constructor(private webviewId: number) {}
+  
+  send(message: any) {
+    const sent = Socket.sendMessageToWebviewViaSocket(
+      this.webviewId,
+      message
+    );
+    
+    if (!sent) {
+      // Fallback to JavaScript execution
+      console.warn('WebSocket not available, using fallback');
+    }
+  }
+}
+```
+
+## Configuration
+
+### Payload Limits
+
+The RPC server has the following limits:
+
+- Max payload: 500MB
+- Backpressure limit: 1GB (messages beyond this are dropped)
+- Idle timeout: 960 seconds
+
+### Port Range
+
+The server attempts to bind to ports 50000-65535. To use a specific port range, you would need to modify the source.
+
+## Notes
+
+- WebSocket connections are automatically managed by the RPC system
+- Each webview has an isolated encrypted channel
+- Messages are automatically encrypted/decrypted
+- The socket connection is established when the webview loads
+- Connections are cleaned up when webviews are destroyed
+
+## When to Use This API
+
+You typically don't need to use the Socket API directly. Use it when:
+
+- Debugging connection issues
+- Monitoring RPC performance
+- Building custom transport layers
+- Implementing advanced RPC patterns
+
+For normal RPC communication, use:
+
+```typescript
+import { BrowserView } from 'electrobun/bun';
+
+const rpc = BrowserView.defineRPC({
+  handlers: {
+    requests: {
+      async getData() {
+        return { data: 'example' };
+      },
+    },
+    messages: {
+      logMessage(msg: string) {
+        console.log(msg);
+      },
+    },
+  },
+});
+```
+
+## Related
+
+- [BrowserView](/api/browser-view) - High-level RPC system
+- [BrowserWindow](/api/browser-window) - Window management

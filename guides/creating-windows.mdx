@@ -1,0 +1,335 @@
+---
+title: Creating Windows
+description: Learn how to create and manage browser windows in Electrobun
+---
+
+## Overview
+
+Browser windows are the main containers for your application's UI. Each window can contain web content, have custom styling, and respond to user interactions.
+
+## Creating a Basic Window
+
+<Steps>
+  <Step title="Import BrowserWindow">
+    First, import the `BrowserWindow` class from Electrobun:
+
+    ```typescript
+    import { BrowserWindow } from "electrobun/bun";
+    ```
+  </Step>
+
+  <Step title="Create a window instance">
+    Create a new window with basic options:
+
+    ```typescript
+    const mainWindow = new BrowserWindow({
+      title: "My App",
+      url: "views://mainview/index.html",
+      frame: {
+        width: 800,
+        height: 600,
+        x: 100,
+        y: 100,
+      },
+    });
+    ```
+  </Step>
+
+  <Step title="Handle window events">
+    Listen to window lifecycle events:
+
+    ```typescript
+    mainWindow.on("close", () => {
+      console.log("Window is closing");
+    });
+    ```
+  </Step>
+</Steps>
+
+## Window Options
+
+### Frame Configuration
+
+The `frame` option defines the window's size and position:
+
+```typescript
+const window = new BrowserWindow({
+  frame: {
+    x: 100,        // X position on screen
+    y: 100,        // Y position on screen
+    width: 1200,   // Window width
+    height: 800,   // Window height
+  },
+});
+```
+
+### Title Bar Styles
+
+Electrobun supports three title bar styles:
+
+<CodeGroup>
+```typescript Default
+const window = new BrowserWindow({
+  titleBarStyle: "default",  // Standard OS title bar
+});
+```
+
+```typescript Hidden
+const window = new BrowserWindow({
+  titleBarStyle: "hidden",   // No title bar, fully custom chrome
+});
+```
+
+```typescript Hidden Inset
+const window = new BrowserWindow({
+  titleBarStyle: "hiddenInset",  // Transparent with inset controls
+});
+```
+</CodeGroup>
+
+### Transparent Windows
+
+Create windows with transparent backgrounds:
+
+```typescript
+const window = new BrowserWindow({
+  transparent: true,
+  titleBarStyle: "hidden",
+});
+```
+
+<Note>
+Transparent windows work best with `titleBarStyle: "hidden"` or `"hiddenInset"`.
+</Note>
+
+### Content Loading
+
+Load content using URLs or raw HTML:
+
+<CodeGroup>
+```typescript URL
+const window = new BrowserWindow({
+  url: "views://mainview/index.html",  // Load from views folder
+});
+```
+
+```typescript HTML
+const window = new BrowserWindow({
+  html: `
+    <!DOCTYPE html>
+    <html>
+      <body>
+        <h1>Hello World</h1>
+      </body>
+    </html>
+  `,
+});
+```
+</CodeGroup>
+
+### Renderer Selection
+
+Choose between native WebKit or CEF renderer:
+
+```typescript
+const window = new BrowserWindow({
+  renderer: "native",  // or "cef"
+});
+```
+
+## Window Control Methods
+
+### Window State
+
+<CodeGroup>
+```typescript Show/Hide
+mainWindow.show();      // Show and focus window
+mainWindow.focus();     // Focus window
+mainWindow.close();     // Close window
+```
+
+```typescript Minimize
+mainWindow.minimize();
+if (mainWindow.isMinimized()) {
+  mainWindow.unminimize();
+}
+```
+
+```typescript Maximize
+mainWindow.maximize();
+if (mainWindow.isMaximized()) {
+  mainWindow.unmaximize();
+}
+```
+
+```typescript Full Screen
+mainWindow.setFullScreen(true);
+if (mainWindow.isFullScreen()) {
+  mainWindow.setFullScreen(false);
+}
+```
+</CodeGroup>
+
+### Position and Size
+
+<CodeGroup>
+```typescript Set Position
+mainWindow.setPosition(100, 200);
+
+const { x, y } = mainWindow.getPosition();
+console.log(`Window is at: ${x}, ${y}`);
+```
+
+```typescript Set Size
+mainWindow.setSize(1200, 800);
+
+const { width, height } = mainWindow.getSize();
+console.log(`Window size: ${width}x${height}`);
+```
+
+```typescript Set Frame
+// Set position and size together
+mainWindow.setFrame(100, 200, 1200, 800);
+
+const frame = mainWindow.getFrame();
+console.log(frame); // { x, y, width, height }
+```
+</CodeGroup>
+
+### Window Behavior
+
+```typescript
+// Keep window always on top
+mainWindow.setAlwaysOnTop(true);
+
+if (mainWindow.isAlwaysOnTop()) {
+  console.log("Window is pinned");
+}
+
+// Update window title
+mainWindow.setTitle("New Title");
+```
+
+## Accessing the Window's View
+
+Every window has an associated webview for RPC and content manipulation:
+
+```typescript
+const window = new BrowserWindow({ /* ... */ });
+
+// Access the webview
+const webview = window.webview;
+
+// Use webview methods
+webview.loadURL("https://electrobun.dev");
+webview.openDevTools();
+```
+
+See [Working with Views](/guides/working-with-views) for more details.
+
+## Sandbox Mode
+
+For untrusted content, enable sandbox mode to disable RPC:
+
+```typescript
+const window = new BrowserWindow({
+  url: "https://external-site.com",
+  sandbox: true,  // Disables RPC, only allows events
+});
+```
+
+<Warning>
+Always use sandbox mode when loading external URLs to prevent malicious sites from accessing internal APIs.
+</Warning>
+
+## Navigation Rules
+
+Control which URLs the window can navigate to:
+
+```typescript
+const rules = JSON.stringify([
+  { action: "allow", pattern: "https://electrobun.dev/*" },
+  { action: "deny", pattern: "*" },
+]);
+
+const window = new BrowserWindow({
+  navigationRules: rules,
+});
+```
+
+## Multiple Windows
+
+Manage multiple windows using the `BrowserWindowMap`:
+
+```typescript
+import { BrowserWindow, BrowserWindowMap } from "electrobun/bun";
+
+// Create windows
+const main = new BrowserWindow({ title: "Main" });
+const settings = new BrowserWindow({ title: "Settings" });
+
+// Access windows by ID
+const window = BrowserWindowMap[main.id];
+
+// Get window by ID
+const retrieved = BrowserWindow.getById(main.id);
+```
+
+## Complete Example
+
+Here's a complete example with window management:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+const mainWindow = new BrowserWindow({
+  title: "My Application",
+  url: "views://mainview/index.html",
+  frame: {
+    width: 1200,
+    height: 800,
+    x: 100,
+    y: 100,
+  },
+  titleBarStyle: "default",
+  transparent: false,
+});
+
+// Handle window close
+mainWindow.on("close", () => {
+  console.log("Main window closing");
+  Utils.quit();
+});
+
+// Center the window after creation
+const { width, height } = mainWindow.getSize();
+mainWindow.setPosition(
+  (screen.width - width) / 2,
+  (screen.height - height) / 2
+);
+
+console.log("Application started!");
+```
+
+## Exit Behavior
+
+By default, Electrobun quits when the last window closes. This can be configured in `electrobun.config.ts`:
+
+```typescript electrobun.config.ts
+export default {
+  runtime: {
+    exitOnLastWindowClosed: false,  // Keep app running
+  },
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Working with Views" icon="window" href="/guides/working-with-views">
+    Learn about BrowserViews and webview management
+  </Card>
+  <Card title="Inter-Process Communication" icon="arrows-left-right" href="/guides/inter-process-communication">
+    Set up RPC between Bun and renderer processes
+  </Card>
+</CardGroup>

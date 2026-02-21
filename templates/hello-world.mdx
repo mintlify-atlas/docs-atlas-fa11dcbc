@@ -1,0 +1,177 @@
+---
+title: Hello World Template
+description: A simple Electrobun app showcasing core features
+icon: hand-wave
+---
+
+The Hello World template is the simplest Electrobun app. It demonstrates the basic structure and core features you need to get started.
+
+## Features
+
+- Basic window creation
+- Simple HTML/CSS UI
+- Views protocol for loading local files
+- Window event handling
+
+## Initialize the Template
+
+Clone the template from the repository:
+
+```bash
+git clone https://github.com/blackboardsh/electrobun.git
+cp -r electrobun/templates/hello-world my-app
+cd my-app
+bun install
+```
+
+Run the app:
+
+```bash
+bun run dev
+```
+
+## Project Structure
+
+```
+hello-world/
+├── src/
+│   ├── bun/
+│   │   └── index.ts          # Main process
+│   └── mainview/
+│       ├── index.html        # UI markup
+│       ├── index.css         # Styles
+│       └── index.ts          # View logic
+├── electrobun.config.ts      # App configuration
+└── package.json
+```
+
+## Key Code
+
+### Creating a Window
+
+The main process creates a window and loads the UI:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+// Create the main application window
+const mainWindow = new BrowserWindow({
+  title: "Hello Electrobun!",
+  url: "views://mainview/index.html",
+  frame: {
+    width: 800,
+    height: 800,
+    x: 200,
+    y: 200,
+  },
+});
+
+// Quit the app when the main window is closed
+mainWindow.on("close", () => {
+  Utils.quit();
+});
+```
+
+### Configuration
+
+The `electrobun.config.ts` file defines the app structure:
+
+```typescript electrobun.config.ts
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "hello-world",
+    identifier: "helloworld.electrobun.dev",
+    version: "0.0.1",
+  },
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+      "src/mainview/index.css": "views/mainview/index.css",
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+### Loading Local Files
+
+The `views://` protocol loads files from your app bundle:
+
+```typescript
+url: "views://mainview/index.html"
+```
+
+This maps to the file copied in the build configuration:
+
+```typescript
+copy: {
+  "src/mainview/index.html": "views/mainview/index.html",
+}
+```
+
+## Available Scripts
+
+<CodeGroup>
+```bash Development
+bun run dev
+```
+
+```bash Build
+bun run build
+```
+
+```bash Start
+bun run start
+```
+</CodeGroup>
+
+## What You'll Learn
+
+<CardGroup cols={2}>
+  <Card title="Window Creation" icon="window-maximize">
+    How to create and configure BrowserWindow instances
+  </Card>
+  
+  <Card title="Views Protocol" icon="folder-open">
+    Loading local HTML files using the views:// protocol
+  </Card>
+  
+  <Card title="Event Handling" icon="bolt">
+    Responding to window events like close
+  </Card>
+  
+  <Card title="App Lifecycle" icon="rotate">
+    Managing app startup and shutdown
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Explore the UI">
+    Open `src/mainview/index.html` and customize the interface
+  </Step>
+  
+  <Step title="Add interactivity">
+    Edit `src/mainview/index.ts` to add JavaScript functionality
+  </Step>
+  
+  <Step title="Try RPC">
+    Learn about [RPC communication](/guides/inter-process-communication) to connect the view and Bun process
+  </Step>
+  
+  <Step title="Build your app">
+    Run `bun run build` to create a production build
+  </Step>
+</Steps>
+
+## Source Code
+
+View the complete template source on GitHub:
+[templates/hello-world](https://github.com/blackboardsh/electrobun/tree/main/templates/hello-world)

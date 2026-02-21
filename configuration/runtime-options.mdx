@@ -1,0 +1,247 @@
+---
+title: Runtime Options
+description: Configure runtime behavior and custom configuration values
+---
+
+## Overview
+
+The `runtime` section allows you to configure application behavior at runtime. These values are copied into `build.json` and are available to the Bun process at runtime via `BuildConfig`.
+
+## Built-in Runtime Options
+
+<ParamField path="runtime.exitOnLastWindowClosed" type="boolean" default="true">
+  Quit the application when the last BrowserWindow is closed.
+  
+  - `true`: App exits when all windows are closed (typical Windows/Linux behavior)
+  - `false`: App continues running when all windows are closed (typical macOS behavior)
+  
+  ```typescript
+  runtime: {
+    exitOnLastWindowClosed: false,
+  }
+  ```
+  
+  This is useful for apps that run in the system tray or need to stay running without visible windows.
+</ParamField>
+
+## Custom Runtime Configuration
+
+You can add arbitrary keys to the `runtime` object and access them via `BuildConfig` in your Bun process:
+
+```typescript
+// electrobun.config.ts
+export default {
+  app: {
+    name: "My App",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  runtime: {
+    exitOnLastWindowClosed: false,
+    apiBaseUrl: "https://api.example.com",
+    featureFlags: {
+      newUI: true,
+      betaFeatures: false,
+    },
+    maxConcurrentDownloads: 5,
+  },
+} satisfies ElectrobunConfig;
+```
+
+### Accessing Runtime Config
+
+In your Bun process, access the runtime configuration via `BuildConfig`:
+
+```typescript
+// src/bun/index.ts
+import { BuildConfig } from "electrobun";
+
+console.log(BuildConfig.exitOnLastWindowClosed); // false
+console.log(BuildConfig.apiBaseUrl); // "https://api.example.com"
+console.log(BuildConfig.featureFlags.newUI); // true
+console.log(BuildConfig.maxConcurrentDownloads); // 5
+
+// Use runtime config to control behavior
+if (BuildConfig.featureFlags.betaFeatures) {
+  // Enable beta features
+}
+
+// Configure API client
+const api = new ApiClient({
+  baseUrl: BuildConfig.apiBaseUrl,
+});
+```
+
+## Type Safety for Custom Config
+
+To get type safety for your custom runtime configuration, you can extend the `ElectrobunConfig` interface:
+
+```typescript
+// types/config.d.ts
+import type { ElectrobunConfig } from "electrobun";
+
+declare module "electrobun" {
+  interface ElectrobunConfig {
+    runtime?: {
+      exitOnLastWindowClosed?: boolean;
+      apiBaseUrl?: string;
+      featureFlags?: {
+        newUI?: boolean;
+        betaFeatures?: boolean;
+      };
+      maxConcurrentDownloads?: number;
+      [key: string]: unknown;
+    };
+  }
+}
+```
+
+Now you'll get autocomplete and type checking for your custom runtime config:
+
+```typescript
+// electrobun.config.ts
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "My App",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  runtime: {
+    apiBaseUrl: "https://api.example.com", // ✓ Type-safe
+    maxConcurrentDownloads: 5, // ✓ Type-safe
+    unknownKey: true, // ✓ Allowed via [key: string]: unknown
+  },
+} satisfies ElectrobunConfig;
+```
+
+## Common Use Cases
+
+### Environment-Specific Configuration
+
+```typescript
+runtime: {
+  apiBaseUrl: process.env.NODE_ENV === "production"
+    ? "https://api.example.com"
+    : "https://api-dev.example.com",
+  debug: process.env.NODE_ENV !== "production",
+}
+```
+
+### Feature Flags
+
+```typescript
+runtime: {
+  featureFlags: {
+    newEditor: true,
+    experimentalRenderer: false,
+    telemetry: true,
+  },
+}
+```
+
+### Application Limits
+
+```typescript
+runtime: {
+  maxConcurrentDownloads: 5,
+  maxFileSize: 100 * 1024 * 1024, // 100 MB
+  requestTimeout: 30000, // 30 seconds
+}
+```
+
+### Service URLs
+
+```typescript
+runtime: {
+  services: {
+    api: "https://api.example.com",
+    auth: "https://auth.example.com",
+    cdn: "https://cdn.example.com",
+  },
+}
+```
+
+## Build.json Output
+
+All runtime configuration values are written to `build.json` in your build output and can be accessed at runtime:
+
+```json
+{
+  "app": {
+    "name": "My App",
+    "identifier": "com.example.myapp",
+    "version": "1.0.0"
+  },
+  "runtime": {
+    "exitOnLastWindowClosed": false,
+    "apiBaseUrl": "https://api.example.com",
+    "featureFlags": {
+      "newUI": true,
+      "betaFeatures": false
+    },
+    "maxConcurrentDownloads": 5
+  }
+}
+```
+
+## Complete Example
+
+```typescript
+import type { ElectrobunConfig } from "electrobun";
+
+const isDev = process.env.NODE_ENV !== "production";
+
+export default {
+  app: {
+    name: "My App",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  runtime: {
+    // Built-in options
+    exitOnLastWindowClosed: false,
+    
+    // Custom configuration
+    apiBaseUrl: isDev ? "http://localhost:3000" : "https://api.example.com",
+    
+    debug: isDev,
+    
+    featureFlags: {
+      newUI: true,
+      betaFeatures: isDev,
+      telemetry: !isDev,
+    },
+    
+    limits: {
+      maxConcurrentDownloads: 5,
+      maxFileSize: 100 * 1024 * 1024,
+      requestTimeout: 30000,
+    },
+    
+    services: {
+      auth: isDev ? "http://localhost:3001" : "https://auth.example.com",
+      cdn: "https://cdn.example.com",
+    },
+  },
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration File" icon="file" href="/configuration/config-file">
+    Learn about the overall config structure
+  </Card>
+  <Card title="Build Options" icon="hammer" href="/configuration/build-options">
+    Configure build and bundler settings
+  </Card>
+</CardGroup>

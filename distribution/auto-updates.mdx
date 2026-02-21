@@ -1,0 +1,360 @@
+---
+title: Auto Updates
+description: Implement automatic updates in your Electrobun app using the built-in update system
+---
+
+Electrobun includes a built-in auto-update system with efficient delta patching using bsdiff.
+
+## Update System Overview
+
+The update system uses:
+
+- **Zstandard compression** for fast, efficient downloads
+- **bsdiff binary patching** for delta updates (reduces download size by ~90%)
+- **Hash-based versioning** for reliable update detection
+- **Release channels** (dev, canary, stable) for staged rollouts
+
+## Configuration
+
+### Enable Updates
+
+Configure the update server in your config:
+
+```typescript electrobun.config.ts
+export default {
+  release: {
+    baseUrl: "https://updates.myapp.com/",
+    generatePatch: true,  // Enable delta patches
+  },
+};
+```
+
+### Server Requirements
+
+Host these files for each platform/channel combination:
+
+```
+https://updates.myapp.com/
+├── stable-macos-arm64-update.json
+├── stable-macos-arm64-MyApp.app.tar.zst
+├── stable-macos-arm64-[old-hash].patch
+├── stable-win-x64-update.json
+├── stable-win-x64-MyApp.tar.zst
+└── stable-linux-x64-update.json
+```
+
+**Update JSON format:**
+
+```json stable-macos-arm64-update.json
+{
+  "version": "1.2.0",
+  "hash": "a1b2c3d4e5f6...",
+  "platform": "macos",
+  "arch": "arm64"
+}
+```
+
+## Implementation
+
+### Basic Update Flow
+
+```typescript src/bun/index.ts
+import { Updater } from "electrobun";
+
+// Check for updates on startup
+const updateInfo = await Updater.checkForUpdate();
+
+if (updateInfo.updateAvailable) {
+  console.log(`Update available: ${updateInfo.version}`);
+  
+  // Download the update
+  await Updater.downloadUpdate();
+  
+  // Apply and restart
+  await Updater.applyUpdate(); // Quits and relaunches
+}
+```
+
+### Update Status Monitoring
+
+Track download progress and update stages:
+
+```typescript src/bun/index.ts
+import { Updater } from "electrobun";
+
+// Listen for update status changes
+Updater.onStatusChange((status) => {
+  console.log(`Update status: ${status.status}`);
+  
+  switch (status.status) {
+    case "checking":
+      console.log("Checking for updates...");
+      break;
+      
+    case "update-available":
+      console.log(`New version available: ${status.details?.latestHash}`);
+      break;
+      
+    case "downloading":
+    case "download-progress":
+      const progress = status.details?.progress || 0;
+      const bytes = status.details?.bytesDownloaded || 0;
+      console.log(`Downloading: ${progress}% (${bytes} bytes)`);
+      break;
+      
+    case "downloading-patch":
+      console.log(`Using delta patch (saves bandwidth)`);
+      break;
+      
+    case "applying-patch":
+      const patchNum = status.details?.patchNumber || 0;
+      console.log(`Applying patch ${patchNum}...`);
+      break;
+      
+    case "download-complete":
+      console.log("Download complete, ready to install");
+      break;
+      
+    case "error":
+      console.error(`Update error: ${status.details?.errorMessage}`);
+      break;
+  }
+});
+
+// Check for updates
+await Updater.checkForUpdate();
+```
+
+### UI Integration Example
+
+```typescript src/bun/update-manager.ts
+import { BrowserWindow, Updater } from "electrobun";
+
+let updateWindow: BrowserWindow;
+let downloadedUpdate = false;
+
+export async function checkForUpdates(showNoUpdateDialog = false) {
+  const info = await Updater.checkForUpdate();
+  
+  if (info.updateAvailable) {
+    // Show update available dialog
+    updateWindow = new BrowserWindow({
+      url: "views/update-dialog/index.html",
+      width: 500,
+      height: 300,
+    });
+    
+    // Track download progress
+    Updater.onStatusChange((status) => {
+      updateWindow.send("update-status", status);
+    });
+    
+    // Start download
+    await Updater.downloadUpdate();
+    downloadedUpdate = true;
+    
+  } else if (showNoUpdateDialog) {
+    // Show "you're up to date" message
+  }
+}
+
+export function installUpdate() {
+  if (downloadedUpdate) {
+    Updater.applyUpdate(); // Quits and restarts
+  }
+}
+```
+
+## Delta Patching
+
+### How It Works
+
+<Steps>
+  <Step title="Check Local Archive">
+    When checking for updates, the updater looks for the current version's tarball in the cache.
+  </Step>
+
+  <Step title="Request Patch Files">
+    For each version from current to latest, request `[old-hash].patch` from the server.
+  </Step>
+
+  <Step title="Apply Patches">
+    Use bsdiff to apply each patch sequentially, creating the next version's tarball.
+  </Step>
+
+  <Step title="Fallback to Full Download">
+    If any patch is missing or fails, download the full tarball instead.
+  </Step>
+</Steps>
+
+**Example patch chain:**
+
+```
+v1.0.0 (hash: aaa111) 
+  + aaa111.patch (2MB) 
+  → v1.1.0 (hash: bbb222)
+  + bbb222.patch (1.5MB)
+  → v1.2.0 (hash: ccc333)
+
+Total download: 3.5MB instead of 45MB full download
+```
+
+### Patch Generation
+
+Patches are automatically created during build when `generatePatch: true`:
+
+<Steps>
+  <Step title="Download Previous Version">
+    Fetch the previous version's tarball from `baseUrl`.
+  </Step>
+
+  <Step title="Generate Binary Diff">
+    Use bsdiff to create a patch file between old and new tarballs.
+  </Step>
+
+  <Step title="Upload Patch">
+    The patch is placed in `artifacts/` with filename `[old-hash].patch`.
+  </Step>
+</Steps>
+
+## Update Channels
+
+Electrobun supports three release channels:
+
+### Channel Behavior
+
+| Channel | Auto-Updates | Use Case |
+|---------|--------------|----------|
+| **dev** | Disabled | Local development |
+| **canary** | Enabled | Beta testing, early adopters |
+| **stable** | Enabled | Production releases |
+
+### Building for Channels
+
+```bash
+# Build for canary channel
+bun electrobun build --env=canary
+
+# Build for stable channel
+bun electrobun build --env=stable
+```
+
+Channels are isolated - apps only update within their own channel.
+
+## API Reference
+
+### `Updater.checkForUpdate()`
+
+Checks the update server for a new version.
+
+```typescript
+const info = await Updater.checkForUpdate();
+// Returns: { version, hash, updateAvailable, updateReady, error }
+```
+
+### `Updater.downloadUpdate()`
+
+Downloads the update (uses delta patches when available).
+
+```typescript
+await Updater.downloadUpdate();
+```
+
+### `Updater.applyUpdate()`
+
+Extracts and installs the update, then quits and relaunches the app.
+
+```typescript
+await Updater.applyUpdate();
+// App will quit and relaunch with new version
+```
+
+### `Updater.updateInfo()`
+
+Get current update state.
+
+```typescript
+const info = Updater.updateInfo();
+// Returns: { version, hash, updateAvailable, updateReady, error }
+```
+
+### `Updater.localInfo`
+
+Access information about the running app.
+
+```typescript
+const version = await Updater.localInfo.version();
+const hash = await Updater.localInfo.hash();
+const channel = await Updater.localInfo.channel();
+const baseUrl = await Updater.localInfo.baseUrl();
+```
+
+### `Updater.onStatusChange(callback)`
+
+Subscribe to update status events.
+
+```typescript
+Updater.onStatusChange((status) => {
+  console.log(status.status, status.message, status.details);
+});
+```
+
+**Status types:**
+- `checking` - Checking for updates
+- `update-available` - New version found
+- `downloading` - Starting download
+- `download-progress` - Download in progress
+- `downloading-patch` - Using delta patch
+- `applying-patch` - Applying binary patch
+- `download-complete` - Ready to install
+- `applying` - Installing update
+- `complete` - Update installed, restarting
+- `error` - Update failed
+
+### `Updater.getStatusHistory()`
+
+Get all status events.
+
+```typescript
+const history = Updater.getStatusHistory();
+// Returns: Array<{ status, message, timestamp, details }>
+```
+
+## Deployment
+
+### Upload Artifacts
+
+After building, upload files from `artifacts/` to your update server:
+
+```bash
+# Example: Upload to S3
+aws s3 sync artifacts/ s3://my-updates-bucket/ --acl public-read
+
+# Example: Upload to Google Cloud Storage
+gsutil -m rsync -r artifacts/ gs://my-updates-bucket/
+```
+
+### CDN Recommendations
+
+- Use a CDN (CloudFlare, CloudFront, etc.) for fast global distribution
+- Enable gzip/brotli compression for `.json` files
+- Set cache headers for tarballs (immutable, long TTL)
+- Use short cache for `update.json` files (5-10 minutes)
+
+### Testing Updates
+
+Test the update flow before releasing:
+
+```bash
+# 1. Build version 1.0.0
+bun electrobun build --env=canary
+
+# 2. Upload artifacts and test the app
+
+# 3. Build version 1.1.0 (generates patch from 1.0.0)
+bun electrobun build --env=canary
+
+# 4. Upload new artifacts
+
+# 5. Run the 1.0.0 app and trigger update check
+```

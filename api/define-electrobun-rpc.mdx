@@ -1,0 +1,559 @@
+---
+title: 'defineElectrobunRPC'
+description: "High-level helper to create RPC instances for Electrobun's bun and webview processes"
+icon: 'bolt'
+---
+
+## Overview
+
+`defineElectrobunRPC` is a convenience wrapper around [`createRPC`](/api/create-rpc) that simplifies RPC setup for Electrobun applications. It handles the bidirectional schema configuration automatically.
+
+<Tip>
+This is the recommended way to set up RPC in Electrobun apps. Use it on both the Bun side (`BrowserView.defineRPC`) and webview side (`Electroview.defineRPC`).
+</Tip>
+
+## Import
+
+<CodeGroup>
+```typescript Bun Process
+import { BrowserView } from "electrobun/bun";
+const rpc = BrowserView.defineRPC<MyRPCSchema>({ ... });
+```
+
+```typescript Webview Process
+import { Electroview } from "electrobun/view";
+const rpc = Electroview.defineRPC<MyRPCSchema>({ ... });
+```
+</CodeGroup>
+
+## Type Signature
+
+```typescript
+function defineElectrobunRPC<
+  Schema extends ElectrobunRPCSchema,
+  Side extends "bun" | "webview" = "bun" | "webview"
+>(
+  side: Side,
+  config: ElectrobunRPCConfig<Schema, Side>
+): RPCInstance
+```
+
+## Parameters
+
+<ParamField path="side" type="'bun' | 'webview'" required>
+  Which process side this RPC instance is for. Automatically set by `BrowserView.defineRPC` ("bun") or `Electroview.defineRPC` ("webview").
+</ParamField>
+
+<ParamField path="config" type="ElectrobunRPCConfig<Schema, Side>" required>
+  Configuration object for the RPC instance
+
+  <Expandable title="properties">
+    <ParamField path="maxRequestTime" type="number" default="1000" optional>
+      Timeout in milliseconds for requests before they fail
+    </ParamField>
+
+    <ParamField path="handlers" type="object" required>
+      Handlers for incoming requests and messages
+
+      <Expandable title="properties">
+        <ParamField path="requests" type="object" optional>
+          Object mapping request method names to handler functions:
+
+          ```typescript
+          requests: {
+            saveFile: async ({ path, content }) => {
+              await Bun.write(path, content);
+              return { success: true };
+            },
+            deleteFile: async ({ path }) => {
+              await Bun.file(path).delete();
+            }
+          }
+          ```
+        </ParamField>
+
+        <ParamField path="messages" type="object" optional>
+          Object mapping message names to handler functions:
+
+          ```typescript
+          messages: {
+            fileChanged: (data) => {
+              console.log("File changed:", data.path);
+            },
+            // Wildcard handler for all messages
+            "*": (messageName, payload) => {
+              console.log(`Message ${messageName}:`, payload);
+            }
+          }
+          ```
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Schema Definition
+
+Define a bidirectional RPC schema that specifies what each side can do:
+
+```typescript
+import { type RPCSchema } from "electrobun/bun";
+
+export type MyRPCSchema = {
+  // What the Bun process handles
+  bun: RPCSchema<{
+    requests: {
+      saveFile: {
+        params: { path: string; content: string };
+        response: { success: boolean };
+      };
+    };
+    messages: {
+      fileChanged: { path: string };
+    };
+  }>;
+
+  // What the webview handles
+  webview: RPCSchema<{
+    requests: {
+      getTheme: {
+        params: void;
+        response: { theme: "light" | "dark" };
+      };
+    };
+    messages: {
+      notifyUser: { message: string };
+    };
+  }>;
+};
+```
+
+<Note>
+Each side can **call requests** defined on the other side and **listen to messages** defined on the other side. But each side **handles requests** and **sends messages** defined on its own side.
+</Note>
+
+## Return Value
+
+Returns an RPC instance with the same methods as [`createRPC`](/api/create-rpc):
+
+- `request` - Make requests to the remote process
+- `send` - Send fire-and-forget messages
+- `addMessageListener` - Listen for incoming messages
+- `removeMessageListener` - Remove message listeners
+- `setTransport` - Update transport (handled automatically)
+
+## Complete Example
+
+Here's a full example showing both the Bun and webview sides:
+
+### 1. Define the Schema
+
+<CodeGroup>
+```typescript src/bun/types/rpc.ts
+import { type RPCSchema } from "electrobun/bun";
+
+export type PhotoBoothRPC = {
+  bun: RPCSchema<{
+    requests: {
+      savePhoto: {
+        params: {
+          dataUrl: string;
+          filename: string;
+        };
+        response: {
+          success: boolean;
+          path?: string;
+          error?: string;
+        };
+      };
+    };
+    messages: {
+      photoSaved: { path: string };
+    };
+  }>;
+  webview: RPCSchema<{
+    requests: {
+      getTheme: {
+        params: void;
+        response: { theme: "light" | "dark" };
+      };
+    };
+    messages: {
+      showNotification: { message: string };
+    };
+  }>;
+};
+```
+</CodeGroup>
+
+### 2. Bun Process (Main)
+
+<CodeGroup>
+```typescript src/bun/index.ts
+import { BrowserWindow, BrowserView, Utils } from "electrobun/bun";
+import type { PhotoBoothRPC } from "./types/rpc";
+
+// Create RPC for Bun side
+const photoBoothRPC = BrowserView.defineRPC<PhotoBoothRPC>({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {
+      savePhoto: async ({ dataUrl, filename }) => {
+        try {
+          // Convert data URL to buffer
+          const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+          const buffer = Buffer.from(base64Data, "base64");
+
+          // Show save dialog
+          const chosenPaths = await Utils.openFileDialog({
+            startingFolder: Bun.env.HOME || "/",
+            allowedFileTypes: "png",
+            canChooseDirectory: true,
+            allowsMultipleSelection: false
+          });
+
+          if (chosenPaths[0]) {
+            const savePath = `${chosenPaths[0]}/${filename}`;
+            await Bun.write(savePath, buffer);
+            return { success: true, path: savePath };
+          }
+
+          return { success: false, error: "Canceled" };
+        } catch (error) {
+          return { success: false, error: (error as Error).message };
+        }
+      }
+    },
+    messages: {
+      showNotification: (data) => {
+        console.log("Show notification:", data.message);
+      }
+    }
+  }
+});
+
+// Create window with RPC
+const mainWindow = new BrowserWindow({
+  title: "Photo Booth",
+  url: "views://mainview/index.html",
+  frame: { width: 1000, height: 700 },
+  rpc: photoBoothRPC
+});
+
+// Send messages to webview
+mainWindow.webview.rpc.send.showNotification({
+  message: "Photo booth ready!"
+});
+
+// Make requests to webview
+const themeResult = await mainWindow.webview.rpc.request.getTheme();
+console.log("Current theme:", themeResult.theme);
+
+mainWindow.on("close", () => Utils.quit());
+```
+</CodeGroup>
+
+### 3. Webview Process (Renderer)
+
+<CodeGroup>
+```typescript src/mainview/index.ts
+import Electrobun, { Electroview } from "electrobun/view";
+import type { PhotoBoothRPC } from "../bun/types/rpc";
+
+// Create RPC for webview side
+const rpc = Electroview.defineRPC<PhotoBoothRPC>({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {
+      getTheme: () => {
+        const isDark = document.body.classList.contains("dark");
+        return { theme: isDark ? "dark" : "light" };
+      }
+    },
+    messages: {
+      showNotification: (data) => {
+        // Show notification in UI
+        const notification = document.createElement("div");
+        notification.className = "notification";
+        notification.textContent = data.message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => notification.remove(), 3000);
+      },
+      photoSaved: (data) => {
+        console.log("Photo saved to:", data.path);
+      }
+    }
+  }
+});
+
+// Initialize Electrobun with RPC
+const electrobun = new Electrobun.Electroview({ rpc });
+
+// Use RPC to save photo
+const saveButton = document.getElementById("saveBtn");
+saveButton?.addEventListener("click", async () => {
+  const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+  const dataUrl = canvas.toDataURL("image/png");
+  const filename = `photo-${Date.now()}.png`;
+
+  const result = await electrobun.rpc.request.savePhoto({
+    dataUrl,
+    filename
+  });
+
+  if (result.success) {
+    console.log("Saved to:", result.path);
+  } else {
+    console.error("Failed to save:", result.error);
+  }
+});
+```
+</CodeGroup>
+
+## Real-World Example: Multitab Browser
+
+Here's a more complex example from Electrobun's multitab browser template:
+
+<CodeGroup>
+```typescript src/bun/types/rpc.ts
+import type { RPCSchema } from "electrobun/bun";
+
+export type Tab = {
+  id: string;
+  title: string;
+  url: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  isLoading: boolean;
+};
+
+export type BrowserRPC = {
+  bun: RPCSchema<{
+    requests: {
+      createTab: {
+        params: { url?: string };
+        response: Tab;
+      };
+      closeTab: {
+        params: { id: string };
+        response: void;
+      };
+      navigateTo: {
+        params: { tabId: string; url: string };
+        response: void;
+      };
+      getAllTabs: {
+        params: {};
+        response: Tab[];
+      };
+    };
+    messages: {
+      tabUpdated: Tab;
+      tabClosed: { id: string };
+    };
+  }>;
+  webview: RPCSchema<{
+    requests: {};
+    messages: {};
+  }>;
+};
+```
+
+```typescript src/bun/index.ts
+import { BrowserWindow, BrowserView } from "electrobun/bun";
+
+const tabs = new Map<string, Tab>();
+let nextTabId = 1;
+let mainRPC: any = null;
+
+const rpc = BrowserView.defineRPC<BrowserRPC>({
+  maxRequestTime: 10000,
+  handlers: {
+    requests: {
+      createTab: async ({ url }) => {
+        const id = `tab-${nextTabId++}`;
+        const tab: Tab = {
+          id,
+          title: "New Tab",
+          url: url || "https://electrobun.dev",
+          canGoBack: false,
+          canGoForward: false,
+          isLoading: false
+        };
+        tabs.set(id, tab);
+
+        // Notify webview
+        setTimeout(() => {
+          mainRPC?.send.tabUpdated(tab);
+        }, 500);
+
+        return tab;
+      },
+
+      closeTab: async ({ id }) => {
+        tabs.delete(id);
+        mainRPC?.send.tabClosed({ id });
+      },
+
+      navigateTo: async ({ tabId, url }) => {
+        const tab = tabs.get(tabId);
+        if (tab) {
+          tab.url = url;
+          mainRPC?.send.tabUpdated(tab);
+        }
+      },
+
+      getAllTabs: async () => {
+        return Array.from(tabs.values());
+      }
+    },
+    messages: {
+      "*": (messageName, payload) => {
+        console.log(`Message: ${String(messageName)}`, payload);
+      }
+    } as any
+  }
+});
+
+const mainWindow = new BrowserWindow({
+  title: "Multitab Browser",
+  url: "views://mainview/index.html",
+  frame: { width: 1400, height: 900 },
+  rpc
+});
+
+mainRPC = mainWindow.webview.rpc;
+```
+
+```typescript src/mainview/index.ts
+import Electrobun, { Electroview } from "electrobun/view";
+import type { BrowserRPC, Tab } from "../bun/types/rpc";
+
+const rpc = Electroview.defineRPC<BrowserRPC>({
+  maxRequestTime: 10000,
+  handlers: {
+    requests: {},
+    messages: {
+      tabUpdated: (tab: Tab) => {
+        console.log("Tab updated:", tab);
+        // Update UI with new tab data
+        updateTabUI(tab);
+      },
+      tabClosed: ({ id }) => {
+        console.log("Tab closed:", id);
+        // Remove tab from UI
+        removeTabFromUI(id);
+      }
+    }
+  }
+});
+
+const electrobun = new Electrobun.Electroview({ rpc });
+
+// Create new tab button handler
+document.getElementById("new-tab-btn")?.addEventListener("click", async () => {
+  const tab = await electrobun.rpc.request.createTab({
+    url: "https://electrobun.dev"
+  });
+  console.log("Created tab:", tab.id);
+});
+
+function updateTabUI(tab: Tab) {
+  // Update tab element in DOM
+  const tabElement = document.getElementById(`tab-${tab.id}`);
+  if (tabElement) {
+    tabElement.querySelector(".tab-title")!.textContent = tab.title;
+  }
+}
+
+function removeTabFromUI(id: string) {
+  document.getElementById(`tab-${id}`)?.remove();
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="1. Share Types Between Processes">
+    Define your RPC schema in a separate file and import it on both sides:
+
+    ```typescript
+    // src/bun/types/rpc.ts
+    export type MyRPC = { ... };
+
+    // src/bun/index.ts
+    import type { MyRPC } from "./types/rpc";
+
+    // src/mainview/index.ts  
+    import type { MyRPC } from "../bun/types/rpc";
+    ```
+  </Accordion>
+
+  <Accordion title="2. Use Async Handlers">
+    All request handlers should be async to handle long-running operations:
+
+    ```typescript
+    requests: {
+      fetchData: async () => {
+        const response = await fetch("https://api.example.com");
+        return await response.json();
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="3. Handle Errors Gracefully">
+    Throw meaningful errors that will be sent to the caller:
+
+    ```typescript
+    requests: {
+      deleteFile: async ({ path }) => {
+        if (!path) {
+          throw new Error("Path is required");
+        }
+        await Bun.file(path).delete();
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="4. Set Appropriate Timeouts">
+    Adjust `maxRequestTime` based on your operation needs:
+
+    ```typescript
+    // Quick operations
+    maxRequestTime: 1000 // 1 second
+
+    // File operations
+    maxRequestTime: 5000 // 5 seconds
+
+    // Network requests
+    maxRequestTime: 10000 // 10 seconds
+    ```
+  </Accordion>
+
+  <Accordion title="5. Use Messages for Notifications">
+    Use messages instead of requests when you don't need a response:
+
+    ```typescript
+    // Good - fire-and-forget notification
+    rpc.send.notifyUser({ message: "File saved" });
+
+    // Bad - unnecessary request overhead
+    await rpc.request.notifyUser({ message: "File saved" });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="RPC Overview" icon="network-wired" href="/api/rpc-overview">
+    Learn about the RPC system architecture
+  </Card>
+  <Card title="createRPC" icon="code" href="/api/create-rpc">
+    Low-level RPC creation for custom use cases
+  </Card>
+</CardGroup>

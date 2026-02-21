@@ -1,0 +1,285 @@
+---
+title: CLI Commands
+description: Complete reference for all Electrobun CLI commands
+---
+
+Electrobun provides a simple CLI for project initialization, development, and building production applications.
+
+## Available Commands
+
+<CardGroup cols={2}>
+  <Card title="init" icon="rocket" href="/cli/init">
+    Create a new Electrobun project from a template
+  </Card>
+  <Card title="build" icon="hammer" href="/cli/build">
+    Build your application for production or development
+  </Card>
+  <Card title="dev" icon="code">
+    Start development mode with hot reload (coming soon)
+  </Card>
+</CardGroup>
+
+## Command Reference
+
+### electrobun init
+
+Initialize a new Electrobun project with a template.
+
+<CodeGroup>
+```bash npm
+npx electrobun init [project-name] [--template=template-name]
+```
+
+```bash bun
+bun x electrobun init [project-name] [--template=template-name]
+```
+</CodeGroup>
+
+**Arguments:**
+- `project-name` (optional) - Name of the project directory
+- `--template` (optional) - Template to use
+
+**Examples:**
+```bash
+# Interactive mode
+electrobun init
+
+# Quick start with template
+electrobun init photo-booth
+
+# Custom project name
+electrobun init my-app --template=photo-booth
+```
+
+[Learn more →](/cli/init)
+
+### electrobun build
+
+Build your Electrobun application for distribution.
+
+<CodeGroup>
+```bash npm
+npm run build
+# or
+npx electrobun build [--env=environment]
+```
+
+```bash bun
+bun run build
+# or
+bun x electrobun build [--env=environment]
+```
+</CodeGroup>
+
+**Options:**
+- `--env` - Build environment: `dev`, `canary`, or `stable` (default: `dev`)
+
+**Examples:**
+```bash
+# Development build (fast, no artifacts)
+electrobun build --env=dev
+
+# Canary build (full packaging)
+electrobun build --env=canary
+
+# Production build
+electrobun build --env=stable
+```
+
+[Learn more →](/cli/build)
+
+## Package Manager Usage
+
+Electrobun CLI can be used with any JavaScript package manager:
+
+<CodeGroup>
+```bash npm
+# Install as dev dependency
+npm install -D electrobun
+
+# Run via npx
+npx electrobun build
+
+# Run via package.json scripts
+npm run build
+```
+
+```bash bun
+# Install as dev dependency
+bun add -d electrobun
+
+# Run via bunx
+bun x electrobun build
+
+# Run via package.json scripts
+bun run build
+```
+
+```bash pnpm
+# Install as dev dependency
+pnpm add -D electrobun
+
+# Run via pnpm dlx
+pnpm dlx electrobun build
+
+# Run via package.json scripts
+pnpm run build
+```
+
+```bash yarn
+# Install as dev dependency
+yarn add -D electrobun
+
+# Run via yarn dlx
+yarn dlx electrobun build
+
+# Run via package.json scripts
+yarn run build
+```
+</CodeGroup>
+
+## Configuration File
+
+All CLI commands read from `electrobun.config.ts` in your project root:
+
+```typescript electrobun.config.ts
+import { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "MyApp",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+    description: "My awesome Electrobun app",
+  },
+  build: {
+    buildFolder: "build",
+    artifactFolder: "artifacts",
+    
+    bun: {
+      entrypoint: "src/bun/index.ts",
+    },
+    
+    views: {
+      main: {
+        entrypoint: "src/views/main/index.ts",
+      },
+    },
+    
+    copy: {
+      "src/views/main/index.html": "views/main/index.html",
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+[View full configuration reference →](/configuration/config-file)
+
+## Common Workflows
+
+### Starting a new project
+
+```bash
+# 1. Initialize project
+bun x electrobun init my-app
+
+# 2. Install dependencies
+cd my-app
+bun install
+
+# 3. Start development
+bun start
+```
+
+### Building for production
+
+```bash
+# 1. Build stable release
+bun run build --env=stable
+
+# 2. Find artifacts
+ls artifacts/
+
+# 3. Distribute
+# Upload artifacts to your hosting/CDN
+```
+
+### Testing before release
+
+```bash
+# 1. Build canary version
+bun run build --env=canary
+
+# 2. Test locally
+open build/macos-arm64/MyApp-canary.app
+
+# 3. If good, build stable
+bun run build --env=stable
+```
+
+## Environment Variables
+
+These environment variables are available during build:
+
+<ParamField path="ELECTROBUN_BUILD_ENV" type="string">
+  Current build environment: `dev`, `canary`, or `stable`
+</ParamField>
+
+<ParamField path="ELECTROBUN_OS" type="string">
+  Target operating system: `macos`, `win`, or `linux`
+</ParamField>
+
+<ParamField path="ELECTROBUN_ARCH" type="string">
+  Target architecture: `arm64` or `x64`
+</ParamField>
+
+<ParamField path="ELECTROBUN_BUILD_DIR" type="string">
+  Absolute path to build output directory
+</ParamField>
+
+<ParamField path="ELECTROBUN_APP_NAME" type="string">
+  Application file name (includes environment suffix for non-stable builds)
+</ParamField>
+
+<ParamField path="ELECTROBUN_APP_VERSION" type="string">
+  Application version from config
+</ParamField>
+
+<ParamField path="ELECTROBUN_APP_IDENTIFIER" type="string">
+  Application identifier (e.g., `com.example.myapp`)
+</ParamField>
+
+<ParamField path="ELECTROBUN_ARTIFACT_DIR" type="string">
+  Absolute path to artifacts output directory
+</ParamField>
+
+## Exit Codes
+
+The CLI uses standard exit codes:
+
+- `0` - Success
+- `1` - General error (configuration, build failure, etc.)
+
+## Getting Help
+
+For command-specific help:
+
+```bash
+# View version
+electrobun --version
+
+# Get help (coming soon)
+electrobun --help
+electrobun init --help
+electrobun build --help
+```
+
+<Note>
+Electrobun is not Electron. The architecture, APIs, and build process are completely different. Do not apply Electron patterns or documentation to Electrobun projects.
+</Note>
+
+## See Also
+
+- [Configuration Overview](/configuration/config-file)
+- [Build Configuration](/configuration/build-options)
+- [Platform Configuration](/configuration/platform-options)

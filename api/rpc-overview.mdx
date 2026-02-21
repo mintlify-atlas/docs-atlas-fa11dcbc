@@ -1,0 +1,196 @@
+---
+title: 'RPC System Overview'
+description: "Learn how Electrobun's type-safe RPC system enables secure communication between main process and webviews"
+icon: 'network-wired'
+---
+
+## What is the RPC System?
+
+Electrobun's RPC (Remote Procedure Call) system provides **type-safe, encrypted communication** between your Bun main process and webview renderer processes. It enables:
+
+- **Bidirectional communication** - Both sides can make requests and send messages
+- **Full type safety** - TypeScript types are preserved across process boundaries
+- **Encrypted transport** - All communication is secured by default
+- **Request/Response pattern** - Await responses from the other process
+- **Fire-and-forget messages** - Send notifications without waiting for responses
+
+## Architecture
+
+The RPC system has three main components:
+
+<CardGroup cols={3}>
+  <Card title="Schema Definition" icon="code">
+    Define typed contracts for requests and messages that both processes understand
+  </Card>
+  <Card title="Bun Process" icon="server">
+    The main Bun process handles system-level operations and responds to webview requests
+  </Card>
+  <Card title="Webview Process" icon="window">
+    The renderer process handles UI and makes requests to the main process
+  </Card>
+</CardGroup>
+
+## Communication Patterns
+
+### Requests (Request/Response)
+
+Requests are **bidirectional** and return a response. Either side can make requests to the other:
+
+```typescript
+// Webview → Bun
+const result = await rpc.request.saveFile({ path: "/file.txt", data: "..." });
+
+// Bun → Webview  
+const theme = await mainWindow.webview.rpc.request.getTheme();
+```
+
+### Messages (Fire-and-forget)
+
+Messages are **one-way notifications** that don't return a response:
+
+```typescript
+// Bun → Webview
+mainWindow.webview.rpc.send.notifyUpdate({ version: "1.0.0" });
+
+// Listen in webview
+rpc.addMessageListener("notifyUpdate", (data) => {
+  console.log("Update available:", data.version);
+});
+```
+
+## Wire Protocol
+
+The RPC system uses an encrypted JSON-based wire protocol with three packet types:
+
+<AccordionGroup>
+  <Accordion title="Request Packet">
+    ```typescript
+    {
+      type: "request",
+      id: number,
+      method: string,
+      params: any
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Response Packet">
+    ```typescript
+    {
+      type: "response",
+      id: number,
+      success: boolean,
+      payload?: any,
+      error?: string
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Message Packet">
+    ```typescript
+    {
+      type: "message",
+      id: string,
+      payload: any
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security
+
+All RPC communication is:
+
+- **Encrypted by default** - Data is secured during transport
+- **Process-isolated** - Each webview has its own encrypted channel
+- **Type-validated** - TypeScript ensures only valid data structures are sent
+
+## Quick Example
+
+Here's a complete example showing both sides:
+
+<CodeGroup>
+```typescript src/bun/index.ts
+import { BrowserWindow, BrowserView, type RPCSchema } from "electrobun/bun";
+
+// Define the RPC schema
+type MyRPC = {
+  bun: RPCSchema<{
+    requests: {
+      saveFile: {
+        params: { path: string; content: string };
+        response: { success: boolean };
+      };
+    };
+    messages: {
+      fileChanged: { path: string };
+    };
+  }>;
+  webview: RPCSchema<{
+    requests: {};
+    messages: {};
+  }>;
+};
+
+// Create RPC instance
+const rpc = BrowserView.defineRPC<MyRPC>({
+  handlers: {
+    requests: {
+      saveFile: async ({ path, content }) => {
+        await Bun.write(path, content);
+        return { success: true };
+      }
+    },
+    messages: {}
+  }
+});
+
+// Create window with RPC
+const mainWindow = new BrowserWindow({
+  url: "views://mainview/index.html",
+  rpc
+});
+
+// Send messages to webview
+mainWindow.webview.rpc.send.fileChanged({ path: "/file.txt" });
+```
+
+```typescript src/mainview/index.ts
+import Electrobun, { Electroview } from "electrobun/view";
+import type { MyRPC } from "../bun/index";
+
+// Create webview RPC
+const rpc = Electroview.defineRPC<MyRPC>({
+  handlers: {
+    requests: {},
+    messages: {
+      fileChanged: (data) => {
+        console.log("File changed:", data.path);
+      }
+    }
+  }
+});
+
+// Initialize Electrobun
+const electrobun = new Electrobun.Electroview({ rpc });
+
+// Make request to Bun process
+const result = await electrobun.rpc.request.saveFile({
+  path: "/file.txt",
+  content: "Hello World"
+});
+
+console.log("Saved:", result.success);
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="createRPC" icon="code" href="/api/create-rpc">
+    Low-level RPC creation for custom transports
+  </Card>
+  <Card title="defineElectrobunRPC" icon="bolt" href="/api/define-electrobun-rpc">
+    High-level helper for Electrobun apps
+  </Card>
+</CardGroup>

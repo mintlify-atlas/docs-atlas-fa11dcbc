@@ -1,0 +1,258 @@
+---
+title: React + Tailwind + Vite
+description: Modern React app with Tailwind CSS and hot module replacement
+icon: react
+---
+
+This template combines React, Tailwind CSS, and Vite to create a modern desktop app with hot module replacement (HMR). It's perfect for building beautiful, responsive interfaces with fast development feedback.
+
+## Features
+
+- React 18 with TypeScript
+- Tailwind CSS for styling
+- Vite for fast builds and HMR
+- Automatic dev server detection
+- Production-ready build configuration
+
+## Initialize the Template
+
+Clone the template from the repository:
+
+```bash
+git clone https://github.com/blackboardsh/electrobun.git
+cp -r electrobun/templates/react-tailwind-vite my-app
+cd my-app
+bun install
+```
+
+## Development Modes
+
+### Standard Development
+
+Run without HMR (faster startup):
+
+```bash
+bun run dev
+```
+
+### HMR Development
+
+Run with hot module replacement:
+
+```bash
+bun run dev:hmr
+```
+
+This starts both the Vite dev server and Electrobun. Changes to React components will update instantly without losing state.
+
+## Project Structure
+
+```
+react-tailwind-vite/
+├── src/
+│   ├── bun/
+│   │   └── index.ts          # Main process with HMR detection
+│   └── mainview/
+│       ├── App.tsx           # Main React component
+│       ├── main.tsx          # React entry point
+│       ├── index.html        # HTML template
+│       └── index.css         # Tailwind imports
+├── electrobun.config.ts      # Electrobun config
+├── vite.config.ts            # Vite configuration
+├── tailwind.config.js        # Tailwind configuration
+└── package.json
+```
+
+## Key Code
+
+### HMR Detection
+
+The Bun process automatically detects if the Vite dev server is running:
+
+```typescript src/bun/index.ts
+const DEV_SERVER_PORT = 5173;
+const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
+
+// Check if Vite dev server is running for HMR
+async function getMainViewUrl(): Promise<string> {
+  const channel = await Updater.localInfo.channel();
+  if (channel === "dev") {
+    try {
+      await fetch(DEV_SERVER_URL, { method: "HEAD" });
+      console.log(`HMR enabled: Using Vite dev server at ${DEV_SERVER_URL}`);
+      return DEV_SERVER_URL;
+    } catch {
+      console.log(
+        "Vite dev server not running. Run 'bun run dev:hmr' for HMR support."
+      );
+    }
+  }
+  return "views://mainview/index.html";
+}
+
+const url = await getMainViewUrl();
+const mainWindow = new BrowserWindow({
+  title: "React + Tailwind + Vite",
+  url,
+  // ...
+});
+```
+
+### React Component
+
+The main App component demonstrates React state and Tailwind styling:
+
+```tsx src/mainview/App.tsx
+import { useState } from "react";
+
+function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600">
+      <div className="container mx-auto px-4 py-10 max-w-3xl">
+        <h1 className="text-5xl font-bold text-center text-white mb-2">
+          React + Tailwind + Vite
+        </h1>
+        
+        <div className="bg-white rounded-xl shadow-xl p-8 mb-8">
+          <button
+            onClick={() => setCount((c) => c + 1)}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg"
+          >
+            Count: {count}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
+```
+
+### Vite Configuration
+
+Vite is configured to work seamlessly with Electrobun:
+
+```typescript vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: "dist/views/mainview",
+    rollupOptions: {
+      input: "src/mainview/index.html",
+    },
+  },
+});
+```
+
+### Tailwind Setup
+
+Import Tailwind in your CSS:
+
+```css src/mainview/index.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+## Available Scripts
+
+<CodeGroup>
+```bash Development (no HMR)
+bun run dev
+```
+
+```bash Development (with HMR)
+bun run dev:hmr
+```
+
+```bash Build
+bun run build
+```
+
+```bash Production Build
+bun run build:prod
+```
+</CodeGroup>
+
+## Technology Stack
+
+<CardGroup cols={2}>
+  <Card title="React 18" icon="react">
+    Modern React with hooks and TypeScript support
+  </Card>
+  
+  <Card title="Tailwind CSS" icon="paintbrush">
+    Utility-first CSS framework for rapid UI development
+  </Card>
+  
+  <Card title="Vite" icon="bolt">
+    Lightning-fast build tool with HMR support
+  </Card>
+  
+  <Card title="TypeScript" icon="code">
+    Type-safe development for both frontend and backend
+  </Card>
+</CardGroup>
+
+## HMR Workflow
+
+<Steps>
+  <Step title="Start dev server">
+    Run `bun run dev:hmr` to start both Vite and Electrobun
+  </Step>
+  
+  <Step title="Edit components">
+    Make changes to `src/mainview/App.tsx`
+  </Step>
+  
+  <Step title="See instant updates">
+    Your changes appear immediately without losing state
+  </Step>
+  
+  <Step title="Build for production">
+    Run `bun run build` when ready to ship
+  </Step>
+</Steps>
+
+<Note>
+  HMR only works in development mode. Production builds use the bundled files from the `dist` directory.
+</Note>
+
+## Customization
+
+### Add Tailwind Plugins
+
+Edit `tailwind.config.js` to add plugins:
+
+```javascript tailwind.config.js
+export default {
+  content: ["./src/mainview/**/*.{html,tsx,ts}"],
+  theme: {
+    extend: {},
+  },
+  plugins: [
+    // Add Tailwind plugins here
+  ],
+};
+```
+
+### Add React Libraries
+
+Install any React library:
+
+```bash
+bun add react-router-dom
+bun add zustand
+bun add @tanstack/react-query
+```
+
+## Source Code
+
+View the complete template source on GitHub:
+[templates/react-tailwind-vite](https://github.com/blackboardsh/electrobun/tree/main/templates/react-tailwind-vite)

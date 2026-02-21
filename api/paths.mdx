@@ -1,0 +1,361 @@
+---
+title: 'Paths'
+description: 'Cross-platform paths to common directories'
+icon: 'folder-tree'
+---
+
+The `paths` object (available via `Utils.paths` or `PATHS`) provides cross-platform access to common system directories.
+
+## Usage
+
+```typescript
+import { Utils } from 'electrobun/bun';
+// or
+import { PATHS } from 'electrobun/bun';
+
+const homePath = Utils.paths.home;
+// or
+const homePath = PATHS.home;
+```
+
+## System Directories
+
+### home
+
+User's home directory.
+
+```typescript
+const home = Utils.paths.home;
+```
+
+<ResponseField name="home" type="string">
+  - macOS: `/Users/username`
+  - Windows: `C:\Users\username`
+  - Linux: `/home/username`
+</ResponseField>
+
+### appData
+
+System-wide application data directory.
+
+```typescript
+const appData = Utils.paths.appData;
+```
+
+<ResponseField name="appData" type="string">
+  - macOS: `~/Library/Application Support`
+  - Windows: `%LOCALAPPDATA%` (e.g., `C:\Users\username\AppData\Local`)
+  - Linux: `$XDG_DATA_HOME` or `~/.local/share`
+</ResponseField>
+
+### config
+
+System configuration directory.
+
+```typescript
+const config = Utils.paths.config;
+```
+
+<ResponseField name="config" type="string">
+  - macOS: `~/Library/Application Support`
+  - Windows: `%APPDATA%` (e.g., `C:\Users\username\AppData\Roaming`)
+  - Linux: `$XDG_CONFIG_HOME` or `~/.config`
+</ResponseField>
+
+### cache
+
+System cache directory.
+
+```typescript
+const cache = Utils.paths.cache;
+```
+
+<ResponseField name="cache" type="string">
+  - macOS: `~/Library/Caches`
+  - Windows: `%LOCALAPPDATA%`
+  - Linux: `$XDG_CACHE_HOME` or `~/.cache`
+</ResponseField>
+
+### temp
+
+Temporary files directory.
+
+```typescript
+const temp = Utils.paths.temp;
+```
+
+<ResponseField name="temp" type="string">
+  Platform temporary directory (from Node.js `os.tmpdir()`)
+</ResponseField>
+
+### logs
+
+System logs directory.
+
+```typescript
+const logs = Utils.paths.logs;
+```
+
+<ResponseField name="logs" type="string">
+  - macOS: `~/Library/Logs`
+  - Windows: `%LOCALAPPDATA%`
+  - Linux: `$XDG_STATE_HOME` or `~/.local/state`
+</ResponseField>
+
+## User Directories
+
+### documents
+
+User's documents folder.
+
+```typescript
+const documents = Utils.paths.documents;
+```
+
+<ResponseField name="documents" type="string">
+  - macOS: `~/Documents`
+  - Windows: `%USERPROFILE%\Documents`
+  - Linux: `$XDG_DOCUMENTS_DIR` or `~/Documents`
+</ResponseField>
+
+### downloads
+
+User's downloads folder.
+
+```typescript
+const downloads = Utils.paths.downloads;
+```
+
+<ResponseField name="downloads" type="string">
+  - macOS: `~/Downloads`
+  - Windows: `%USERPROFILE%\Downloads`
+  - Linux: `$XDG_DOWNLOAD_DIR` or `~/Downloads`
+</ResponseField>
+
+### desktop
+
+User's desktop folder.
+
+```typescript
+const desktop = Utils.paths.desktop;
+```
+
+<ResponseField name="desktop" type="string">
+  - macOS: `~/Desktop`
+  - Windows: `%USERPROFILE%\Desktop`
+  - Linux: `$XDG_DESKTOP_DIR` or `~/Desktop`
+</ResponseField>
+
+### pictures
+
+User's pictures folder.
+
+```typescript
+const pictures = Utils.paths.pictures;
+```
+
+<ResponseField name="pictures" type="string">
+  - macOS: `~/Pictures`
+  - Windows: `%USERPROFILE%\Pictures`
+  - Linux: `$XDG_PICTURES_DIR` or `~/Pictures`
+</ResponseField>
+
+### music
+
+User's music folder.
+
+```typescript
+const music = Utils.paths.music;
+```
+
+<ResponseField name="music" type="string">
+  - macOS: `~/Music`
+  - Windows: `%USERPROFILE%\Music`
+  - Linux: `$XDG_MUSIC_DIR` or `~/Music`
+</ResponseField>
+
+### videos
+
+User's videos folder.
+
+```typescript
+const videos = Utils.paths.videos;
+```
+
+<ResponseField name="videos" type="string">
+  - macOS: `~/Movies`
+  - Windows: `%USERPROFILE%\Videos`
+  - Linux: `$XDG_VIDEOS_DIR` or `~/Videos`
+</ResponseField>
+
+## App-Scoped Directories
+
+These directories are specific to your application (based on app identifier and channel from `version.json`).
+
+### userData
+
+App-specific user data directory.
+
+```typescript
+const userData = Utils.paths.userData;
+```
+
+<ResponseField name="userData" type="string">
+  `{appData}/{identifier}/{channel}`
+  
+  Example: `~/Library/Application Support/com.example.myapp/stable`
+</ResponseField>
+
+### userCache
+
+App-specific cache directory.
+
+```typescript
+const userCache = Utils.paths.userCache;
+```
+
+<ResponseField name="userCache" type="string">
+  `{cache}/{identifier}/{channel}`
+  
+  Example: `~/Library/Caches/com.example.myapp/stable`
+</ResponseField>
+
+### userLogs
+
+App-specific logs directory.
+
+```typescript
+const userLogs = Utils.paths.userLogs;
+```
+
+<ResponseField name="userLogs" type="string">
+  `{logs}/{identifier}/{channel}`
+  
+  Example: `~/Library/Logs/com.example.myapp/stable`
+</ResponseField>
+
+## Examples
+
+### Save User Data
+
+```typescript
+import { Utils } from 'electrobun/bun';
+import { join } from 'path';
+import { writeFileSync, mkdirSync } from 'fs';
+
+function saveUserData(data: any) {
+  const userDataPath = Utils.paths.userData;
+  
+  // Ensure directory exists
+  mkdirSync(userDataPath, { recursive: true });
+  
+  // Save data
+  const filePath = join(userDataPath, 'settings.json');
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
+  
+  console.log('Saved to:', filePath);
+}
+```
+
+### Cache Management
+
+```typescript
+import { Utils } from 'electrobun/bun';
+import { join } from 'path';
+import { rmdirSync, mkdirSync } from 'fs';
+
+function clearCache() {
+  const cachePath = Utils.paths.userCache;
+  
+  // Remove cache directory
+  rmdirSync(cachePath, { recursive: true });
+  
+  // Recreate it
+  mkdirSync(cachePath, { recursive: true });
+  
+  console.log('Cache cleared:', cachePath);
+}
+```
+
+### Log Files
+
+```typescript
+import { Utils } from 'electrobun/bun';
+import { join } from 'path';
+import { appendFileSync, mkdirSync } from 'fs';
+
+function writeLog(message: string) {
+  const logsPath = Utils.paths.userLogs;
+  
+  // Ensure directory exists
+  mkdirSync(logsPath, { recursive: true });
+  
+  // Append to log file
+  const logFile = join(logsPath, 'app.log');
+  const timestamp = new Date().toISOString();
+  appendFileSync(logFile, `[${timestamp}] ${message}\n`);
+}
+```
+
+### File Picker with Default Location
+
+```typescript
+import { Utils } from 'electrobun/bun';
+
+const files = await Utils.openFileDialog({
+  startingFolder: Utils.paths.downloads,
+  allowedFileTypes: '*.pdf,*.doc,*.docx',
+  canChooseFiles: true,
+  canChooseDirectory: false,
+});
+```
+
+### Export to Documents
+
+```typescript
+import { Utils } from 'electrobun/bun';
+import { join } from 'path';
+import { writeFileSync } from 'fs';
+
+function exportToDocuments(data: string, filename: string) {
+  const documentsPath = Utils.paths.documents;
+  const exportPath = join(documentsPath, filename);
+  
+  writeFileSync(exportPath, data);
+  
+  // Show in file manager
+  Utils.showItemInFolder(exportPath);
+}
+
+exportToDocuments('My exported data', 'export.txt');
+```
+
+## Linux XDG Support
+
+On Linux, the paths API respects XDG Base Directory specification:
+
+- Reads `~/.config/user-dirs.dirs` for user directory locations
+- Falls back to standard locations if not configured
+- Supports environment variables like `$XDG_DATA_HOME`, `$XDG_CONFIG_HOME`, etc.
+
+## Channel Isolation
+
+App-scoped directories (`userData`, `userCache`, `userLogs`) include the channel name:
+
+- `stable` channel: `~/Library/Application Support/com.example.app/stable`
+- `beta` channel: `~/Library/Application Support/com.example.app/beta`
+- `dev` channel: `~/Library/Application Support/com.example.app/dev`
+
+This allows different builds to maintain separate data.
+
+## Notes
+
+- All paths are absolute (fully qualified)
+- Directories may not exist - create them with `mkdirSync` as needed
+- App-scoped directories are based on `identifier` and `channel` from your build config
+- User directories on Linux respect XDG configuration
+
+## Related
+
+- [Utils](/api/utils) - Utility functions including file operations
+- [Updater](/api/updater) - Uses app-scoped directories for updates

@@ -1,0 +1,537 @@
+---
+title: Menus and Trays
+description: Learn how to create application menus, context menus, and system tray icons
+---
+
+## Overview
+
+Electrobun provides APIs for creating native menus and system tray icons:
+
+- **Application menus**: Native menu bar (File, Edit, View, etc.)
+- **Context menus**: Right-click menus
+- **Tray icons**: System tray / menu bar icons with menus
+
+## Application Menus
+
+### Creating a Menu
+
+<Steps>
+  <Step title="Import ApplicationMenu">
+    ```typescript
+    import { ApplicationMenu } from "electrobun/bun";
+    ```
+  </Step>
+
+  <Step title="Define menu structure">
+    ```typescript
+    const menuTemplate = [
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "New File",
+            action: "new-file",
+            accelerator: "CmdOrCtrl+N",
+          },
+          { type: "divider" },
+          {
+            label: "Quit",
+            role: "quit",
+            accelerator: "CmdOrCtrl+Q",
+          },
+        ],
+      },
+      {
+        label: "Edit",
+        submenu: [
+          { label: "Cut", role: "cut" },
+          { label: "Copy", role: "copy" },
+          { label: "Paste", role: "paste" },
+        ],
+      },
+    ];
+    ```
+  </Step>
+
+  <Step title="Set the application menu">
+    ```typescript
+    ApplicationMenu.setApplicationMenu(menuTemplate);
+    ```
+  </Step>
+
+  <Step title="Handle menu clicks">
+    ```typescript
+    ApplicationMenu.on("application-menu-clicked", (event) => {
+      const { action, data } = event.data;
+      
+      if (action === "new-file") {
+        console.log("New file clicked");
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+### Menu Item Options
+
+Each menu item supports these options:
+
+```typescript
+type MenuItem = {
+  label?: string;           // Display text
+  type?: "normal" | "divider" | "separator";
+  action?: string;          // Custom action identifier
+  role?: string;            // Predefined role (see below)
+  data?: unknown;           // Custom data passed to handler
+  submenu?: MenuItem[];     // Nested menu items
+  enabled?: boolean;        // Default: true
+  checked?: boolean;        // For checkbox items
+  hidden?: boolean;         // Hide the item
+  accelerator?: string;     // Keyboard shortcut
+  tooltip?: string;         // Tooltip text
+};
+```
+
+### Keyboard Accelerators
+
+Use standard accelerator syntax:
+
+```typescript
+{
+  label: "Save",
+  action: "save",
+  accelerator: "CmdOrCtrl+S",  // Cmd on Mac, Ctrl on Windows/Linux
+}
+
+// More examples:
+// "CmdOrCtrl+Shift+S"  - Save As
+// "Alt+F4"             - Close (Windows)
+// "F11"                - Full screen
+// "CmdOrCtrl+W"        - Close tab
+```
+
+### Menu Roles
+
+Use predefined roles for common actions:
+
+```typescript
+const menu = [
+  {
+    label: "Edit",
+    submenu: [
+      { role: "undo" },
+      { role: "redo" },
+      { type: "divider" },
+      { role: "cut" },
+      { role: "copy" },
+      { role: "paste" },
+      { role: "selectAll" },
+    ],
+  },
+  {
+    label: "View",
+    submenu: [
+      { role: "reload" },
+      { role: "toggleDevTools" },
+      { type: "divider" },
+      { role: "toggleFullScreen" },
+    ],
+  },
+  {
+    label: "Window",
+    submenu: [
+      { role: "minimize" },
+      { role: "zoom" },
+      { role: "close" },
+    ],
+  },
+];
+```
+
+Available roles: `undo`, `redo`, `cut`, `copy`, `paste`, `selectAll`, `delete`, `quit`, `reload`, `toggleDevTools`, `toggleFullScreen`, `minimize`, `zoom`, `close`, `front`, `hide`, `hideOthers`, `unhide`.
+
+### Complete Menu Example
+
+```typescript src/bun/menu.ts
+import { ApplicationMenu, BrowserWindow, Utils } from "electrobun/bun";
+
+export function setupMenu(mainWindow: BrowserWindow) {
+  const menu = [
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New Window",
+          action: "new-window",
+          accelerator: "CmdOrCtrl+N",
+        },
+        { type: "divider" },
+        {
+          label: "Close Window",
+          action: "close-window",
+          accelerator: "CmdOrCtrl+W",
+        },
+        { type: "divider" },
+        {
+          label: "Quit",
+          role: "quit",
+          accelerator: "CmdOrCtrl+Q",
+        },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { label: "Undo", role: "undo" },
+        { label: "Redo", role: "redo" },
+        { type: "divider" },
+        { label: "Cut", role: "cut" },
+        { label: "Copy", role: "copy" },
+        { label: "Paste", role: "paste" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        {
+          label: "Reload",
+          role: "reload",
+          accelerator: "CmdOrCtrl+R",
+        },
+        {
+          label: "Toggle Developer Tools",
+          role: "toggleDevTools",
+          accelerator: "Alt+CmdOrCtrl+I",
+        },
+      ],
+    },
+  ];
+
+  ApplicationMenu.setApplicationMenu(menu);
+
+  ApplicationMenu.on("application-menu-clicked", (event) => {
+    const { action } = event.data;
+
+    switch (action) {
+      case "new-window":
+        new BrowserWindow({
+          title: "New Window",
+          url: "views://mainview/index.html",
+        });
+        break;
+      case "close-window":
+        mainWindow.close();
+        break;
+    }
+  });
+}
+```
+
+## Context Menus
+
+Create right-click menus anywhere in your app:
+
+```typescript
+import { ContextMenu } from "electrobun/bun";
+
+// Show a context menu
+ContextMenu.showContextMenu([
+  {
+    label: "Copy",
+    action: "copy",
+  },
+  {
+    label: "Paste",
+    action: "paste",
+  },
+  { type: "divider" },
+  {
+    label: "Delete",
+    action: "delete",
+  },
+]);
+
+// Handle context menu clicks
+ContextMenu.on("context-menu-clicked", (event) => {
+  const { action, data } = event.data;
+  
+  console.log(`Context menu action: ${action}`);
+});
+```
+
+### Context Menu with Data
+
+Pass custom data to menu items:
+
+```typescript
+const selectedFile = { id: 123, name: "document.txt" };
+
+ContextMenu.showContextMenu([
+  {
+    label: "Open",
+    action: "open-file",
+    data: selectedFile,
+  },
+  {
+    label: "Delete",
+    action: "delete-file",
+    data: selectedFile,
+  },
+]);
+
+ContextMenu.on("context-menu-clicked", (event) => {
+  const { action, data } = event.data;
+  
+  if (action === "delete-file") {
+    console.log(`Deleting file: ${data.name}`);
+  }
+});
+```
+
+## System Tray
+
+Create system tray icons (macOS menu bar, Windows system tray):
+
+<Steps>
+  <Step title="Import Tray">
+    ```typescript
+    import { Tray } from "electrobun/bun";
+    ```
+  </Step>
+
+  <Step title="Create a tray icon">
+    ```typescript
+    const tray = new Tray({
+      title: "My App",
+      image: "views://assets/icon.png",
+      template: true,  // Use template image (macOS)
+      width: 16,
+      height: 16,
+    });
+    ```
+  </Step>
+
+  <Step title="Set tray menu">
+    ```typescript
+    tray.setMenu([
+      {
+        label: "Show Window",
+        action: "show",
+      },
+      { type: "divider" },
+      {
+        label: "Quit",
+        action: "quit",
+      },
+    ]);
+    ```
+  </Step>
+
+  <Step title="Handle tray events">
+    ```typescript
+    tray.on("tray-clicked", (event) => {
+      const { action } = event.data;
+      
+      if (action === "show") {
+        mainWindow.show();
+      } else if (action === "quit") {
+        Utils.quit();
+      }
+    });
+    ```
+  </Step>
+</Steps>
+
+### Tray Options
+
+```typescript
+type TrayOptions = {
+  title?: string;      // Text displayed in tray (macOS)
+  image?: string;      // Icon image path
+  template?: boolean;  // Template image adapts to dark/light mode (macOS)
+  width?: number;      // Icon width
+  height?: number;     // Icon height
+};
+```
+
+### Updating Tray
+
+Update tray properties dynamically:
+
+```typescript
+const tray = new Tray({ title: "Idle" });
+
+// Update title
+tray.setTitle("Active");
+
+// Update icon
+tray.setImage("views://assets/active-icon.png");
+
+// Update menu
+tray.setMenu([
+  { label: "Status: Active", enabled: false },
+  { type: "divider" },
+  { label: "Pause", action: "pause" },
+]);
+```
+
+### Complete Tray Example
+
+```typescript src/bun/tray.ts
+import { Tray, BrowserWindow, Utils } from "electrobun/bun";
+
+export function setupTray(mainWindow: BrowserWindow) {
+  const tray = new Tray({
+    title: "",
+    image: "views://assets/tray-icon.png",
+    template: true,
+  });
+
+  const updateTrayMenu = () => {
+    tray.setMenu([
+      {
+        label: "Show Window",
+        action: "show-window",
+      },
+      { type: "divider" },
+      {
+        label: mainWindow.isMinimized() ? "Restore" : "Minimize",
+        action: "toggle-minimize",
+      },
+      { type: "divider" },
+      {
+        label: "Quit",
+        action: "quit",
+      },
+    ]);
+  };
+
+  updateTrayMenu();
+
+  tray.on("tray-clicked", (event) => {
+    const { action } = event.data;
+
+    switch (action) {
+      case "show-window":
+        mainWindow.show();
+        mainWindow.focus();
+        break;
+      case "toggle-minimize":
+        if (mainWindow.isMinimized()) {
+          mainWindow.unminimize();
+        } else {
+          mainWindow.minimize();
+        }
+        updateTrayMenu();
+        break;
+      case "quit":
+        Utils.quit();
+        break;
+    }
+  });
+
+  return tray;
+}
+```
+
+### Removing Tray Icons
+
+```typescript
+// Remove a specific tray
+tray.remove();
+
+// Or by ID
+Tray.removeById(trayId);
+
+// Get all trays
+const allTrays = Tray.getAll();
+```
+
+## Platform Considerations
+
+<Tabs>
+  <Tab title="macOS">
+    - Application menu appears in the menu bar
+    - Tray icons appear in the menu bar (right side)
+    - Template images automatically adapt to dark/light mode
+    - Use SF Symbols for system icons
+  </Tab>
+
+  <Tab title="Windows">
+    - Application menu appears in window title bar
+    - Tray icons appear in system tray (bottom-right)
+    - Use PNG images with transparency
+    - Recommended icon size: 16x16 or 32x32
+  </Tab>
+
+  <Tab title="Linux">
+    - Application menu behavior varies by desktop environment
+    - Tray support depends on desktop environment
+    - Use SVG or PNG images
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use standard menu roles">
+    Prefer built-in roles over custom actions for standard operations:
+
+    ```typescript
+    // Good: Uses standard role
+    { label: "Quit", role: "quit" }
+
+    // Less ideal: Custom action
+    { label: "Quit", action: "quit" }
+    ```
+  </Accordion>
+
+  <Accordion title="Provide keyboard shortcuts">
+    Add accelerators for frequently used actions:
+
+    ```typescript
+    {
+      label: "Save",
+      action: "save",
+      accelerator: "CmdOrCtrl+S",
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Keep menus organized">
+    Use dividers to group related items:
+
+    ```typescript
+    [
+      { label: "New", action: "new" },
+      { label: "Open", action: "open" },
+      { type: "divider" },
+      { label: "Save", action: "save" },
+      { label: "Save As", action: "save-as" },
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Handle tray gracefully">
+    Tray creation may fail on some systems:
+
+    ```typescript
+    try {
+      const tray = new Tray({ /* ... */ });
+    } catch (error) {
+      console.log("Tray not supported on this system");
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Native Integrations" icon="laptop-code" href="/guides/native-integrations">
+    Learn about notifications, dialogs, and file system
+  </Card>
+  <Card title="Platform-Specific Features" icon="desktop" href="/guides/platform-specific-features">
+    Handle macOS, Windows, and Linux differences
+  </Card>
+</CardGroup>

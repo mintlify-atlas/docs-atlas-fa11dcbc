@@ -1,0 +1,312 @@
+---
+title: 'Updater'
+description: 'Manage application updates'
+icon: 'arrows-rotate'
+---
+
+The `Updater` module provides APIs for checking, downloading, and applying application updates.
+
+## checkForUpdate
+
+Check if an update is available.
+
+```typescript
+import { Updater } from 'electrobun/bun';
+
+const updateInfo = await Updater.checkForUpdate();
+```
+
+<ResponseField name="return" type="object">
+  <Expandable title="Update info object">
+    <ResponseField name="version" type="string">
+      Latest version available
+    </ResponseField>
+    <ResponseField name="hash" type="string">
+      Hash of the latest version
+    </ResponseField>
+    <ResponseField name="updateAvailable" type="boolean">
+      Whether an update is available
+    </ResponseField>
+    <ResponseField name="updateReady" type="boolean">
+      Whether the update has been downloaded and is ready to install
+    </ResponseField>
+    <ResponseField name="error" type="string">
+      Error message if update check failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## downloadUpdate
+
+Download the available update.
+
+```typescript
+await Updater.downloadUpdate();
+```
+
+This method:
+1. Checks for local tar files to enable patch updates
+2. Attempts to download and apply patches if available (saves bandwidth)
+3. Falls back to full download if patches aren't available
+4. Emits progress events during download and extraction
+
+## applyUpdate
+
+Apply the downloaded update and restart the application.
+
+```typescript
+await Updater.applyUpdate();
+```
+
+<Note>
+  This will quit and restart your application. Make sure to save any user data before calling.
+</Note>
+
+## Example
+
+```typescript
+import { Updater } from 'electrobun/bun';
+
+// Check for updates on startup
+const localInfo = await Updater.getLocallocalInfo();
+console.log(`Current version: ${localInfo.version} (${localInfo.channel})`);
+
+const updateInfo = await Updater.checkForUpdate();
+
+if (updateInfo.updateAvailable) {
+  console.log(`Update available: ${updateInfo.version}`);
+  
+  // Download the update
+  await Updater.downloadUpdate();
+  
+  if (Updater.updateInfo().updateReady) {
+    // Prompt user to restart
+    const { response } = await Utils.showMessageBox({
+      type: 'question',
+      title: 'Update Available',
+      message: 'A new version has been downloaded. Restart now?',
+      buttons: ['Restart', 'Later'],
+    });
+    
+    if (response === 0) {
+      await Updater.applyUpdate();
+    }
+  }
+}
+```
+
+## Status Monitoring
+
+### onStatusChange
+
+Register a callback to receive granular update status changes.
+
+```typescript
+Updater.onStatusChange((entry) => {
+  console.log(`Status: ${entry.status}`);
+  console.log(`Message: ${entry.message}`);
+  console.log(`Details:`, entry.details);
+});
+```
+
+<ParamField path="callback" type="(entry: UpdateStatusEntry) => void" required>
+  Function to call on each status change
+  
+  <Expandable title="UpdateStatusEntry">
+    <ParamField path="status" type="UpdateStatusType">
+      Current status: `idle`, `checking`, `update-available`, `downloading`, `download-progress`, `decompressing`, `applying`, `complete`, `error`, etc.
+    </ParamField>
+    
+    <ParamField path="message" type="string">
+      Human-readable status message
+    </ParamField>
+    
+    <ParamField path="timestamp" type="number">
+      Unix timestamp of the status change
+    </ParamField>
+    
+    <ParamField path="details" type="UpdateStatusDetails" optional>
+      Additional details about the status
+      <Expandable title="UpdateStatusDetails">
+        <ResponseField name="currentHash" type="string" optional>
+          Current version hash
+        </ResponseField>
+        <ResponseField name="latestHash" type="string" optional>
+          Latest version hash
+        </ResponseField>
+        <ResponseField name="progress" type="number" optional>
+          Download progress percentage (0-100)
+        </ResponseField>
+        <ResponseField name="bytesDownloaded" type="number" optional>
+          Bytes downloaded so far
+        </ResponseField>
+        <ResponseField name="totalBytes" type="number" optional>
+          Total bytes to download
+        </ResponseField>
+        <ResponseField name="totalPatchesApplied" type="number" optional>
+          Number of patches applied
+        </ResponseField>
+        <ResponseField name="usedPatchPath" type="boolean" optional>
+          Whether patch updates were used instead of full download
+        </ResponseField>
+        <ResponseField name="errorMessage" type="string" optional>
+          Error message if status is error
+        </ResponseField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### getStatusHistory
+
+Get the full history of status changes.
+
+```typescript
+const history = Updater.getStatusHistory();
+```
+
+<ResponseField name="return" type="UpdateStatusEntry[]">
+  Array of all status changes
+</ResponseField>
+
+### clearStatusHistory
+
+Clear the status history.
+
+```typescript
+Updater.clearStatusHistory();
+```
+
+## Update Info
+
+### updateInfo
+
+Get the current update information.
+
+```typescript
+const info = Updater.updateInfo();
+```
+
+<ResponseField name="return" type="object">
+  Object with version, hash, updateAvailable, updateReady, and error fields
+</ResponseField>
+
+### localInfo
+
+Access local build information.
+
+```typescript
+const version = await Updater.localInfo.version();
+const hash = await Updater.localInfo.hash();
+const channel = await Updater.localInfo.channel();
+const baseUrl = await Updater.localInfo.baseUrl();
+```
+
+<ResponseField name="version" type="() => Promise<string>">
+  Get the current app version
+</ResponseField>
+
+<ResponseField name="hash" type="() => Promise<string>">
+  Get the current build hash
+</ResponseField>
+
+<ResponseField name="channel" type="() => Promise<string>">
+  Get the update channel (e.g., 'stable', 'beta', 'dev')
+</ResponseField>
+
+<ResponseField name="baseUrl" type="() => Promise<string>">
+  Get the base URL for updates
+</ResponseField>
+
+### getLocallocalInfo
+
+Get all local build information.
+
+```typescript
+const info = await Updater.getLocallocalInfo();
+```
+
+<ResponseField name="return" type="object">
+  <Expandable title="Local info object">
+    <ResponseField name="version" type="string">
+      Current app version
+    </ResponseField>
+    <ResponseField name="hash" type="string">
+      Current build hash
+    </ResponseField>
+    <ResponseField name="channel" type="string">
+      Update channel
+    </ResponseField>
+    <ResponseField name="baseUrl" type="string">
+      Base URL for updates
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      App name
+    </ResponseField>
+    <ResponseField name="identifier" type="string">
+      App identifier
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Paths
+
+### channelBucketUrl
+
+Get the update channel bucket URL.
+
+```typescript
+const url = await Updater.channelBucketUrl();
+```
+
+<ResponseField name="return" type="string">
+  Base URL for the update channel
+</ResponseField>
+
+### appDataFolder
+
+Get the app data folder path.
+
+```typescript
+const path = await Updater.appDataFolder();
+```
+
+<ResponseField name="return" type="string">
+  Path to app data folder (includes identifier and channel)
+</ResponseField>
+
+## Update Status Types
+
+The updater emits various status types during the update process:
+
+- `idle` - No update operation in progress
+- `checking` - Checking for updates
+- `no-update` - No update available
+- `update-available` - Update is available
+- `downloading` - Starting download
+- `download-progress` - Download in progress
+- `checking-local-tar` - Checking for local files for patch updates
+- `local-tar-found` - Local files found, will try patch updates
+- `downloading-patch` - Downloading a patch file
+- `applying-patch` - Applying a patch
+- `patch-applied` - Patch applied successfully
+- `patch-chain-complete` - All patches applied
+- `downloading-full-bundle` - Downloading full update
+- `decompressing` - Decompressing update
+- `download-complete` - Download finished
+- `applying` - Applying update
+- `extracting` - Extracting files
+- `replacing-app` - Replacing application files
+- `complete` - Update complete
+- `error` - An error occurred
+
+## Notes
+
+- Updates are disabled in the `dev` channel
+- The updater attempts to use binary patches to save bandwidth when possible
+- Full update history is maintained and can be accessed for debugging
+
+## Related
+
+- [Build Options](/configuration/build-options) - Build configuration options
+- [Utils](/api/utils) - Utility functions including quit()

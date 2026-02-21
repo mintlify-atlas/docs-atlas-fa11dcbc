@@ -1,0 +1,432 @@
+---
+title: 'BrowserWindow'
+description: 'Create and control native application windows'
+icon: 'window'
+---
+
+The `BrowserWindow` class is the core API for creating and managing native application windows in Electrobun.
+
+## Constructor
+
+Create a new browser window.
+
+```typescript
+const window = new BrowserWindow(options);
+```
+
+<ParamField path="options" type="Partial<WindowOptionsType>" optional>
+  Configuration options for the window
+  
+  <Expandable title="WindowOptionsType properties">
+    <ParamField path="title" type="string" default="'Electrobun'">
+      The window title
+    </ParamField>
+    
+    <ParamField path="frame" type="object" default="{x: 0, y: 0, width: 800, height: 600}">
+      Window position and size
+      <Expandable title="Frame properties">
+        <ParamField path="x" type="number">
+          Window x position in pixels
+        </ParamField>
+        <ParamField path="y" type="number">
+          Window y position in pixels
+        </ParamField>
+        <ParamField path="width" type="number">
+          Window width in pixels
+        </ParamField>
+        <ParamField path="height" type="number">
+          Window height in pixels
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="url" type="string | null" default="null">
+      URL to load in the window. Use `views://` protocol for local views.
+    </ParamField>
+    
+    <ParamField path="html" type="string | null" default="null">
+      HTML content to load directly. Cannot be used with `url`.
+    </ParamField>
+    
+    <ParamField path="preload" type="string | null" default="null">
+      Path to a preload script
+    </ParamField>
+    
+    <ParamField path="renderer" type="'native' | 'cef'">
+      Rendering engine to use. Defaults to build config setting.
+    </ParamField>
+    
+    <ParamField path="titleBarStyle" type="'default' | 'hidden' | 'hiddenInset'" default="'default'">
+      Title bar style:
+      - `default`: Normal titlebar with native controls
+      - `hidden`: No titlebar, no native controls (for fully custom chrome)
+      - `hiddenInset`: Transparent titlebar with inset native controls
+    </ParamField>
+    
+    <ParamField path="transparent" type="boolean" default="false">
+      When true, window background is transparent (see-through)
+    </ParamField>
+    
+    <ParamField path="navigationRules" type="string | null" default="null">
+      JSON string of navigation rules to control which URLs can be loaded
+    </ParamField>
+    
+    <ParamField path="sandbox" type="boolean" default="false">
+      When true, disables RPC and only allows event emission. Use for untrusted content (remote URLs) to prevent malicious sites from accessing internal APIs.
+    </ParamField>
+    
+    <ParamField path="rpc" type="T" optional>
+      RPC schema for communication between main and renderer process
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Example
+
+```typescript
+import { BrowserWindow, Utils } from 'electrobun/bun';
+
+// Create a basic window
+const mainWindow = new BrowserWindow({
+  title: 'Hello Electrobun!',
+  url: 'views://mainview/index.html',
+  frame: {
+    width: 800,
+    height: 800,
+    x: 200,
+    y: 200,
+  },
+});
+
+// Quit when window closes
+mainWindow.on('close', () => {
+  Utils.quit();
+});
+```
+
+## Properties
+
+<ResponseField name="id" type="number">
+  Unique window identifier
+</ResponseField>
+
+<ResponseField name="ptr" type="Pointer">
+  Native pointer to the window object
+</ResponseField>
+
+<ResponseField name="webview" type="BrowserView<T>">
+  The BrowserView attached to this window (read-only getter)
+</ResponseField>
+
+<ResponseField name="title" type="string">
+  Current window title
+</ResponseField>
+
+<ResponseField name="frame" type="object">
+  Current window frame (position and size)
+</ResponseField>
+
+## Methods
+
+### setTitle
+
+Set the window title.
+
+```typescript
+window.setTitle(title);
+```
+
+<ParamField path="title" type="string" required>
+  New window title
+</ParamField>
+
+### close
+
+Close the window.
+
+```typescript
+window.close();
+```
+
+### focus / show
+
+Bring the window to focus.
+
+```typescript
+window.focus();
+window.show(); // Alias for focus
+```
+
+### minimize
+
+Minimize the window.
+
+```typescript
+window.minimize();
+```
+
+### unminimize
+
+Restore the window from minimized state.
+
+```typescript
+window.unminimize();
+```
+
+### isMinimized
+
+Check if window is minimized.
+
+```typescript
+const minimized = window.isMinimized();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if window is minimized
+</ResponseField>
+
+### maximize
+
+Maximize the window.
+
+```typescript
+window.maximize();
+```
+
+### unmaximize
+
+Restore the window from maximized state.
+
+```typescript
+window.unmaximize();
+```
+
+### isMaximized
+
+Check if window is maximized.
+
+```typescript
+const maximized = window.isMaximized();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if window is maximized
+</ResponseField>
+
+### setFullScreen
+
+Set window fullscreen state.
+
+```typescript
+window.setFullScreen(fullScreen);
+```
+
+<ParamField path="fullScreen" type="boolean" required>
+  Whether to enter or exit fullscreen
+</ParamField>
+
+### isFullScreen
+
+Check if window is in fullscreen mode.
+
+```typescript
+const fullscreen = window.isFullScreen();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if window is fullscreen
+</ResponseField>
+
+### setAlwaysOnTop
+
+Set whether window should always stay on top.
+
+```typescript
+window.setAlwaysOnTop(alwaysOnTop);
+```
+
+<ParamField path="alwaysOnTop" type="boolean" required>
+  Whether to keep window on top
+</ParamField>
+
+### isAlwaysOnTop
+
+Check if window is always on top.
+
+```typescript
+const onTop = window.isAlwaysOnTop();
+```
+
+<ResponseField name="return" type="boolean">
+  `true` if window is always on top
+</ResponseField>
+
+### setPosition
+
+Set window position.
+
+```typescript
+window.setPosition(x, y);
+```
+
+<ParamField path="x" type="number" required>
+  X coordinate in pixels
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  Y coordinate in pixels
+</ParamField>
+
+### setSize
+
+Set window size.
+
+```typescript
+window.setSize(width, height);
+```
+
+<ParamField path="width" type="number" required>
+  Width in pixels
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  Height in pixels
+</ParamField>
+
+### setFrame
+
+Set window position and size simultaneously.
+
+```typescript
+window.setFrame(x, y, width, height);
+```
+
+<ParamField path="x" type="number" required>
+  X coordinate in pixels
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  Y coordinate in pixels
+</ParamField>
+
+<ParamField path="width" type="number" required>
+  Width in pixels
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  Height in pixels
+</ParamField>
+
+### getFrame
+
+Get current window position and size.
+
+```typescript
+const { x, y, width, height } = window.getFrame();
+```
+
+<ResponseField name="return" type="object">
+  <Expandable title="Frame object">
+    <ResponseField name="x" type="number">
+      X coordinate in pixels
+    </ResponseField>
+    <ResponseField name="y" type="number">
+      Y coordinate in pixels
+    </ResponseField>
+    <ResponseField name="width" type="number">
+      Width in pixels
+    </ResponseField>
+    <ResponseField name="height" type="number">
+      Height in pixels
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### getPosition
+
+Get current window position.
+
+```typescript
+const { x, y } = window.getPosition();
+```
+
+<ResponseField name="return" type="object">
+  <Expandable title="Position object">
+    <ResponseField name="x" type="number">
+      X coordinate in pixels
+    </ResponseField>
+    <ResponseField name="y" type="number">
+      Y coordinate in pixels
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### getSize
+
+Get current window size.
+
+```typescript
+const { width, height } = window.getSize();
+```
+
+<ResponseField name="return" type="object">
+  <Expandable title="Size object">
+    <ResponseField name="width" type="number">
+      Width in pixels
+    </ResponseField>
+    <ResponseField name="height" type="number">
+      Height in pixels
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### on
+
+Listen to window events.
+
+```typescript
+window.on(eventName, handler);
+```
+
+<ParamField path="eventName" type="string" required>
+  Name of the event to listen for
+</ParamField>
+
+<ParamField path="handler" type="(event: unknown) => void" required>
+  Event handler function
+</ParamField>
+
+## Static Methods
+
+### BrowserWindow.getById
+
+Get a window instance by its ID.
+
+```typescript
+const window = BrowserWindow.getById(id);
+```
+
+<ParamField path="id" type="number" required>
+  Window ID
+</ParamField>
+
+<ResponseField name="return" type="BrowserWindow | undefined">
+  Window instance or undefined if not found
+</ResponseField>
+
+## Events
+
+### close
+
+Emitted when the window is closed.
+
+```typescript
+window.on('close', (event) => {
+  console.log('Window closed');
+});
+```
+
+## Related
+
+- [BrowserView](/api/browser-view) - Manage web content within windows
+- [Application Menu](/api/application-menu) - Create native application menus

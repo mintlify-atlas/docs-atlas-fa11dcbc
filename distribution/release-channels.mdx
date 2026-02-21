@@ -1,0 +1,351 @@
+---
+title: Release Channels
+description: Use release channels to manage staged rollouts and beta testing
+---
+
+Electrobun supports multiple release channels to enable staged rollouts, beta testing, and stable production releases.
+
+## Channel Overview
+
+Electrobun provides three built-in channels:
+
+<CardGroup cols={3}>
+  <Card title="dev" icon="code">
+    Local development builds with auto-updates disabled
+  </Card>
+  <Card title="canary" icon="flask">
+    Pre-release builds for beta testers and early adopters
+  </Card>
+  <Card title="stable" icon="check">
+    Production-ready releases for all users
+  </Card>
+</CardGroup>
+
+## Channel Behavior
+
+| Feature | dev | canary | stable |
+|---------|-----|--------|--------|
+| Auto-updates | ❌ | ✅ | ✅ |
+| Code signing | ❌ | Optional | Required |
+| Notarization | ❌ | Optional | Required |
+| App identifier | `com.example.app-dev` | `com.example.app-canary` | `com.example.app` |
+| Data directory | `~/.../{id}/dev/` | `~/.../{id}/canary/` | `~/.../{id}/stable/` |
+
+<Note>
+  Each channel runs as a separate app with isolated data storage. Users can have all three installed simultaneously.
+</Note>
+
+## Building for Channels
+
+### Specify Channel
+
+Use the `--env` flag when building:
+
+```bash
+# Development build (default)
+bun electrobun build
+bun electrobun build --env=dev
+
+# Canary/beta build
+bun electrobun build --env=canary
+
+# Production build
+bun electrobun build --env=stable
+```
+
+### Channel-Specific Naming
+
+Electrobun automatically adds channel suffixes to builds:
+
+**macOS:**
+```
+MyApp-dev.app        # Development
+MyApp-canary.app     # Canary
+MyApp.app            # Stable (no suffix)
+```
+
+**Windows:**
+```
+MyApp-dev.exe
+MyApp-canary.exe
+MyApp.exe
+```
+
+**Linux:**
+```
+MyApp-dev/
+MyApp-canary/
+MyApp/
+```
+
+## Channel Isolation
+
+### Separate Data Directories
+
+Each channel stores data in its own directory:
+
+**macOS:**
+```
+~/Library/Application Support/
+  └── com.example.myapp/
+      ├── dev/
+      ├── canary/
+      └── stable/
+```
+
+**Windows:**
+```
+%LOCALAPPDATA%\\com.example.myapp\\
+  ├── dev\\
+  ├── canary\\
+  └── stable\\
+```
+
+**Linux:**
+```
+~/.local/share/com.example.myapp/
+  ├── dev/
+  ├── canary/
+  └── stable/
+```
+
+### Update Isolation
+
+Apps only check for updates within their own channel:
+
+```typescript
+// Canary app only downloads canary updates from:
+https://updates.myapp.com/canary-macos-arm64-update.json
+
+// Stable app only downloads stable updates from:
+https://updates.myapp.com/stable-macos-arm64-update.json
+```
+
+## Deployment Strategy
+
+### Recommended Workflow
+
+<Steps>
+  <Step title="Develop with dev channel">
+    Use `--env=dev` during development. Auto-updates are disabled, allowing rapid iteration.
+    
+    ```bash
+    bun electrobun build --env=dev
+    ```
+  </Step>
+
+  <Step title="Test with canary channel">
+    Deploy to canary channel for internal testing and early adopters:
+    
+    ```bash
+    bun electrobun build --env=canary
+    # Upload artifacts to canary channel on update server
+    ```
+  </Step>
+
+  <Step title="Monitor canary releases">
+    Collect feedback and monitor crash reports from canary users for 1-2 weeks.
+  </Step>
+
+  <Step title="Promote to stable">
+    When confident, build for stable and release to all users:
+    
+    ```bash
+    bun electrobun build --env=stable
+    # Upload artifacts to stable channel
+    ```
+  </Step>
+</Steps>
+
+### Example CI/CD Pipeline
+
+```yaml .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    branches:
+      - develop  # Trigger canary builds
+      - main     # Trigger stable builds
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Determine channel
+        id: channel
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "env=stable" >> $GITHUB_OUTPUT
+          else
+            echo "env=canary" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Build
+        run: bun electrobun build --env=${{ steps.channel.outputs.env }}
+      
+      - name: Upload to S3
+        run: |
+          aws s3 sync artifacts/ s3://my-updates-bucket/ \
+            --acl public-read
+```
+
+## Update Server Structure
+
+Organize your update server by channel:
+
+```
+https://updates.myapp.com/
+├── dev-macos-arm64-update.json
+├── dev-macos-arm64-MyApp-dev.app.tar.zst
+├── canary-macos-arm64-update.json
+├── canary-macos-arm64-MyApp-canary.app.tar.zst
+├── canary-macos-arm64-[hash].patch
+├── stable-macos-arm64-update.json
+├── stable-macos-arm64-MyApp.app.tar.zst
+└── stable-macos-arm64-[hash].patch
+```
+
+<Note>
+  The filename pattern is: `{channel}-{platform}-{arch}-{filename}`
+</Note>
+
+## Runtime Detection
+
+Detect the current channel at runtime:
+
+```typescript src/bun/index.ts
+import { Updater } from "electrobun";
+
+const channel = await Updater.localInfo.channel();
+
+if (channel === "canary") {
+  // Enable beta features or extra logging
+  console.log("Running in canary mode");
+} else if (channel === "stable") {
+  // Production behavior
+}
+```
+
+## Testing Multiple Channels
+
+Install multiple channels side-by-side:
+
+```bash
+# Build all channels
+bun electrobun build --env=dev
+bun electrobun build --env=canary  
+bun electrobun build --env=stable
+
+# Install all three - they won't conflict
+open artifacts/dev-macos-arm64-MyApp-dev.app
+open artifacts/canary-macos-arm64-MyApp-canary.app
+open artifacts/stable-macos-arm64-MyApp.app
+```
+
+Each runs independently with separate:
+- App bundle identifiers
+- Data directories
+- Update channels
+- Window instances
+
+## Channel Migration
+
+Users can't automatically migrate between channels. If you want users to switch:
+
+1. **Manual approach:** Ask users to download the desired channel from your website
+2. **Data migration:** Export user data from one channel and import to another
+
+```typescript
+// Example: Export user data
+import { Updater } from "electrobun";
+import { writeFile, readFile } from "fs/promises";
+
+const appDataDir = await Updater.appDataFolder();
+const userData = await readFile(`${appDataDir}/user-data.json`);
+
+// User can move this to the new channel's data directory
+await writeFile("/path/to/export/user-data.json", userData);
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Keep canary active for at least 1 week">
+    Let your early adopters thoroughly test canary releases before promoting to stable. This catches issues before they affect all users.
+  </Accordion>
+
+  <Accordion title="Use feature flags for gradual rollouts">
+    Even within stable, use feature flags to enable new features for a percentage of users:
+    
+    ```typescript
+    const isFeatureEnabled = Math.random() < 0.1; // 10% rollout
+    ```
+  </Accordion>
+
+  <Accordion title="Monitor crash reports per channel">
+    Track errors separately for each channel to identify stability issues early.
+  </Accordion>
+
+  <Accordion title="Version numbers across channels">
+    Use semantic versioning consistently:
+    - Dev: `1.2.0-dev.123`
+    - Canary: `1.2.0-canary.5`
+    - Stable: `1.2.0`
+  </Accordion>
+</AccordionGroup>
+
+## Channel-Specific Configuration
+
+Customize behavior per channel using runtime detection:
+
+```typescript electrobun.config.ts
+import type { ElectrobunConfig } from "electrobun";
+
+const config: ElectrobunConfig = {
+  app: {
+    name: "MyApp",
+    identifier: "com.example.myapp",
+    version: "1.2.0",
+  },
+  build: {
+    mac: {
+      // Only sign/notarize canary and stable
+      codesign: process.env.BUILD_ENV !== "dev",
+      notarize: process.env.BUILD_ENV === "stable",
+    },
+  },
+  release: {
+    // Different update servers per channel
+    baseUrl: process.env.BUILD_ENV === "stable" 
+      ? "https://updates.myapp.com/"
+      : "https://canary-updates.myapp.com/",
+  },
+};
+
+export default config;
+```
+
+```typescript src/bun/index.ts
+import { Updater } from "electrobun";
+
+const channel = await Updater.localInfo.channel();
+
+// Enable analytics only in stable
+if (channel === "stable") {
+  enableAnalytics();
+}
+
+// Extra logging in canary
+if (channel === "canary") {
+  console.log("Canary mode: verbose logging enabled");
+}
+```

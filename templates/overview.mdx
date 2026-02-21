@@ -1,0 +1,100 @@
+---
+title: Templates Overview
+description: Ready-to-use Electrobun project templates to kickstart your desktop app development
+---
+
+Electrobun provides several project templates to help you get started quickly. Each template demonstrates different features and technology stacks.
+
+## Available Templates
+
+<CardGroup cols={2}>
+  <Card title="Hello World" icon="hand-wave" href="/templates/hello-world">
+    Simple starter template showcasing core Electrobun features
+  </Card>
+  
+  <Card title="React + Tailwind + Vite" icon="react" href="/templates/react-tailwind-vite">
+    Modern React app with Tailwind CSS and hot module replacement
+  </Card>
+  
+  <Card title="Svelte" icon="bolt" href="/templates/svelte">
+    Svelte 5 app with Vite HMR for fast, reactive development
+  </Card>
+  
+  <Card title="Multitab Browser" icon="window" href="/templates/multitab-browser">
+    Browser-like app with tabs and navigation controls
+  </Card>
+  
+  <Card title="Photo Booth" icon="camera" href="/templates/photo-booth">
+    Camera and screen capture app using getUserMedia API
+  </Card>
+</CardGroup>
+
+## Using Templates
+
+All templates are available in the [Electrobun repository](https://github.com/blackboardsh/electrobun/tree/main/templates). You can:
+
+1. Clone the repository and copy a template:
+   ```bash
+   git clone https://github.com/blackboardsh/electrobun.git
+   cp -r electrobun/templates/hello-world my-app
+   cd my-app
+   ```
+
+2. Install dependencies:
+   ```bash
+   bun install
+   ```
+
+3. Run the template:
+   ```bash
+   bun run dev
+   ```
+
+## Template Structure
+
+All templates follow a similar structure:
+
+```
+template-name/
+├── src/
+│   ├── bun/              # Bun process code
+│   │   └── index.ts      # Main entry point
+│   └── mainview/         # View code (HTML/CSS/JS)
+│       ├── index.html
+│       └── index.ts
+├── electrobun.config.ts  # Electrobun configuration
+└── package.json
+```
+
+## Key Concepts
+
+<AccordionGroup>
+  <Accordion title="Bun Process">
+    The `src/bun/` directory contains code that runs in the Bun process. This is where you:
+    - Create windows and views
+    - Handle system-level operations
+    - Define RPC handlers
+    - Access Node.js/Bun APIs
+  </Accordion>
+  
+  <Accordion title="View Process">
+    The `src/mainview/` directory contains code that runs in the webview. This is where you:
+    - Build your UI with HTML/CSS/JavaScript
+    - Use frontend frameworks (React, Svelte, etc.)
+    - Call RPC methods to communicate with the Bun process
+  </Accordion>
+  
+  <Accordion title="Configuration">
+    The `electrobun.config.ts` file defines:
+    - App metadata (name, version, identifier)
+    - Build settings (views, assets to copy)
+    - Platform-specific options
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Explore each template to learn about different features:
+- Start with [Hello World](/templates/hello-world) for the basics
+- Try [React + Tailwind + Vite](/templates/react-tailwind-vite) for modern web development
+- Check out [Photo Booth](/templates/photo-booth) for media capture features

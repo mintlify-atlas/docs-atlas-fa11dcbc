@@ -1,0 +1,309 @@
+---
+title: electrobun build
+description: Build your Electrobun application for production or development
+---
+
+The `build` command compiles your Electrobun application into a distributable package, handling bundling, code signing, packaging, and artifact generation.
+
+## Usage
+
+<CodeGroup>
+```bash npm
+npm run build
+# or directly
+npx electrobun build [--env=environment]
+```
+
+```bash bun
+bun run build
+# or directly
+bun x electrobun build [--env=environment]
+```
+
+```bash pnpm
+pnpm run build
+# or directly
+pnpm dlx electrobun build [--env=environment]
+```
+
+```bash yarn
+yarn run build
+# or directly
+yarn dlx electrobun build [--env=environment]
+```
+</CodeGroup>
+
+## Options
+
+<ParamField path="--env" type="string" default="dev">
+  Build environment. Determines naming, code signing, and artifact generation.
+  
+  **Valid values:**
+  - `dev` - Development builds (no artifacts, fast iteration)
+  - `canary` - Pre-release builds with full packaging
+  - `stable` - Production builds with full packaging
+</ParamField>
+
+## Build Environments
+
+### Development (`--env=dev`)
+
+```bash
+electrobun build --env=dev
+```
+
+- Fast builds for local testing
+- No code signing or notarization
+- No installer/artifact generation
+- App name: `MyApp-dev.app` (macOS) or `MyApp-dev` (Linux/Windows)
+- No delta patch generation
+- Hash is set to "dev" instead of computed
+
+### Canary (`--env=canary`)
+
+```bash
+electrobun build --env=canary
+```
+
+- Pre-release builds for testing
+- Full packaging and artifact generation
+- Code signing and notarization (if configured)
+- App name: `MyApp-canary.app` (macOS) or `MyApp-canary` (Linux/Windows)
+- Generates installers and update artifacts
+- Delta patch generation (if previous version available)
+
+### Stable (`--env=stable`)
+
+```bash
+electrobun build --env=stable
+```
+
+- Production builds for public release
+- Full packaging and artifact generation
+- Code signing and notarization (if configured)
+- App name: `MyApp.app` (macOS) or `MyApp` (Linux/Windows)
+- Generates installers and update artifacts
+- Delta patch generation (if previous version available)
+
+## Build Process
+
+The build command performs these steps in order:
+
+1. **Pre-build hook** - Runs `scripts.preBuild` if configured
+2. **Core dependencies** - Downloads platform-specific binaries if needed
+3. **Bundle creation** - Compiles Bun process and browser view code
+4. **Asset copying** - Copies files specified in `build.copy`
+5. **Icon generation** - Processes platform-specific icons
+6. **Post-build hook** - Runs `scripts.postBuild` if configured
+7. **ASAR packaging** - Packs resources into app.asar (if enabled)
+8. **Version metadata** - Generates version.json and build.json
+9. **Code signing** - Signs the app (macOS, if configured)
+10. **Notarization** - Notarizes with Apple (macOS, if configured)
+11. **Packaging** - Creates platform installers
+12. **Delta patches** - Generates update patches (canary/stable only)
+13. **Post-wrap hook** - Runs `scripts.postWrap` if configured
+14. **Post-package hook** - Runs `scripts.postPackage` if configured
+
+## Configuration
+
+The build command uses settings from your `electrobun.config.ts` file:
+
+```typescript electrobun.config.ts
+export default {
+  app: {
+    name: "MyApp",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  build: {
+    buildFolder: "build",
+    artifactFolder: "artifacts",
+    useAsar: true,
+    asarUnpack: ["*.node", "*.dll"],
+    
+    bun: {
+      entrypoint: "src/bun/index.ts",
+    },
+    
+    views: {
+      main: {
+        entrypoint: "src/views/main/index.ts",
+      },
+    },
+    
+    copy: {
+      "src/views/main/index.html": "views/main/index.html",
+    },
+    
+    mac: {
+      codesign: false,
+      notarize: false,
+      bundleCEF: false,
+      icons: "icon.iconset",
+    },
+    
+    win: {
+      bundleCEF: false,
+      icon: "assets/icon.ico",
+    },
+    
+    linux: {
+      bundleCEF: false,
+      icon: "assets/icon.png",
+    },
+  },
+  release: {
+    baseUrl: "https://releases.example.com",
+    generatePatch: true,
+  },
+};
+```
+
+## Build Artifacts
+
+### macOS
+
+For canary/stable builds:
+- `MyApp.dmg` - DMG installer with self-extracting app
+- `MyApp.app.tar.zst` - Compressed app bundle for updates
+- `{hash}.patch` - Delta patch file (if previous version exists)
+- `macos-arm64-update.json` - Update metadata
+
+### Windows
+
+For canary/stable builds:
+- `MyApp-Setup.exe` - Self-extracting installer
+- `MyApp.tar.zst` - Compressed app bundle for updates
+- `{hash}.patch` - Delta patch file (if previous version exists)
+- `win-x64-update.json` - Update metadata
+
+### Linux
+
+For canary/stable builds:
+- `MyApp-Setup.tar.gz` - Installer archive with extractor and README
+- `MyApp.tar.zst` - Compressed app bundle for updates
+- `{hash}.patch` - Delta patch file (if previous version exists)
+- `linux-x64-update.json` - Update metadata
+
+## ASAR Packaging
+
+When `build.useAsar` is enabled, resources are packed into a single `app.asar` archive:
+
+```typescript
+build: {
+  useAsar: true,
+  asarUnpack: ["*.node", "*.dll", "*.dylib", "*.so"],
+}
+```
+
+<Note>
+Native modules (`.node` files) and shared libraries must be unpacked to `app.asar.unpacked` to work correctly. The default `asarUnpack` patterns handle this automatically.
+</Note>
+
+## Code Signing (macOS)
+
+For macOS builds, you can enable code signing and notarization:
+
+```typescript
+mac: {
+  codesign: true,
+  notarize: true,
+  entitlements: {
+    "com.apple.security.cs.allow-jit": true,
+    "com.apple.security.cs.allow-unsigned-executable-memory": true,
+    "com.apple.security.cs.disable-library-validation": true,
+  },
+}
+```
+
+<Warning>
+Code signing and notarization only work when building on macOS. Cross-platform builds from Linux/Windows will skip these steps.
+</Warning>
+
+## Build Hooks
+
+Run custom scripts at different stages of the build:
+
+```typescript
+scripts: {
+  preBuild: "./scripts/pre-build.ts",
+  postBuild: "./scripts/post-build.ts",
+  postWrap: "./scripts/post-wrap.ts",
+  postPackage: "./scripts/post-package.ts",
+}
+```
+
+Environment variables available to hooks:
+
+- `ELECTROBUN_BUILD_ENV` - Build environment (dev/canary/stable)
+- `ELECTROBUN_OS` - Target OS (macos/win/linux)
+- `ELECTROBUN_ARCH` - Target architecture (arm64/x64)
+- `ELECTROBUN_BUILD_DIR` - Build output directory
+- `ELECTROBUN_APP_NAME` - Application file name
+- `ELECTROBUN_APP_VERSION` - Application version
+- `ELECTROBUN_APP_IDENTIFIER` - Application identifier
+- `ELECTROBUN_ARTIFACT_DIR` - Artifacts output directory
+
+## Custom CEF/Bun Versions
+
+Override the bundled CEF or Bun versions:
+
+```typescript
+build: {
+  cefVersion: "144.0.11+ge135be2+chromium-144.0.7559.97",
+  bunVersion: "1.4.2",
+}
+```
+
+<Warning>
+Custom versions are downloaded from official sources and cached in `node_modules/.electrobun-cache/`. Check compatibility before overriding.
+</Warning>
+
+## Examples
+
+### Quick development build
+
+```bash
+bun run build
+```
+
+### Build for canary testing
+
+```bash
+electrobun build --env=canary
+```
+
+### Build for production release
+
+```bash
+electrobun build --env=stable
+```
+
+## Troubleshooting
+
+### Missing core dependencies
+
+If you see "Core dependencies not found", the CLI will automatically download them:
+
+```
+Core dependencies not found for macos-arm64.
+Downloading core binaries...
+```
+
+### ASAR packing failures
+
+If ASAR packing fails, check that native modules are in `asarUnpack` patterns:
+
+```typescript
+asarUnpack: ["*.node", "*.dll", "*.dylib", "*.so"],
+```
+
+### Code signing issues
+
+Ensure you have valid Apple Developer credentials and certificates installed. Check the build output for specific errors.
+
+## See Also
+
+- [Configuration](/configuration/config-file) - Full configuration options
+- [Build Configuration](/configuration/build-options) - Detailed build settings
+- [Platform Configuration](/configuration/platform-options) - Platform-specific options

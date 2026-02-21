@@ -1,0 +1,252 @@
+---
+title: 'Tray'
+description: 'Create system tray icons with menus'
+icon: 'window-restore'
+---
+
+The `Tray` class allows you to create system tray (menu bar) icons with custom menus.
+
+## Constructor
+
+Create a new system tray icon.
+
+```typescript
+const tray = new Tray(options);
+```
+
+<ParamField path="options" type="TrayOptions" optional>
+  Configuration options for the tray
+  
+  <Expandable title="TrayOptions properties">
+    <ParamField path="title" type="string" default="''">
+      Text to display next to the tray icon (macOS only)
+    </ParamField>
+    
+    <ParamField path="image" type="string" default="''">
+      Path to the tray icon image. Use `views://` protocol for bundled images.
+    </ParamField>
+    
+    <ParamField path="template" type="boolean" default="true">
+      Whether to use template image mode (adapts to dark/light theme on macOS)
+    </ParamField>
+    
+    <ParamField path="width" type="number" default="16">
+      Icon width in pixels
+    </ParamField>
+    
+    <ParamField path="height" type="number" default="16">
+      Icon height in pixels
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Example
+
+```typescript
+import { Tray } from 'electrobun/bun';
+
+const tray = new Tray({
+  image: 'views://icons/tray-icon.png',
+  title: 'My App',
+  template: true,
+});
+
+tray.setMenu([
+  {
+    label: 'Show Window',
+    action: 'show-window',
+  },
+  {
+    type: 'divider',
+  },
+  {
+    label: 'Quit',
+    action: 'quit',
+  },
+]);
+
+tray.on('tray-clicked', (event) => {
+  const { action } = event;
+  if (action === 'show-window') {
+    mainWindow.show();
+  } else if (action === 'quit') {
+    Utils.quit();
+  }
+});
+```
+
+## Properties
+
+<ResponseField name="id" type="number">
+  Unique tray identifier
+</ResponseField>
+
+<ResponseField name="ptr" type="Pointer | null">
+  Native pointer to the tray object (null if creation failed)
+</ResponseField>
+
+## Methods
+
+### setTitle
+
+Set the tray title text.
+
+```typescript
+tray.setTitle(title);
+```
+
+<ParamField path="title" type="string" required>
+  New title text (macOS only)
+</ParamField>
+
+### setImage
+
+Set the tray icon image.
+
+```typescript
+tray.setImage(imagePath);
+```
+
+<ParamField path="imagePath" type="string" required>
+  Path to the icon image. Use `views://` protocol for bundled images.
+</ParamField>
+
+### setMenu
+
+Set the tray context menu.
+
+```typescript
+tray.setMenu(menu);
+```
+
+<ParamField path="menu" type="Array<MenuItemConfig>" required>
+  Array of menu item configurations
+  
+  <Expandable title="MenuItemConfig">
+    <ParamField path="type" type="'normal' | 'divider' | 'separator'" default="'normal'">
+      Menu item type
+    </ParamField>
+    
+    <ParamField path="label" type="string" optional>
+      Menu item label (required for normal items)
+    </ParamField>
+    
+    <ParamField path="action" type="string" optional>
+      Action identifier to emit when clicked
+    </ParamField>
+    
+    <ParamField path="data" type="any" optional>
+      Custom data to pass with the action
+    </ParamField>
+    
+    <ParamField path="enabled" type="boolean" default="true">
+      Whether the item is enabled
+    </ParamField>
+    
+    <ParamField path="checked" type="boolean" default="false">
+      Whether the item is checked (for checkbox items)
+    </ParamField>
+    
+    <ParamField path="hidden" type="boolean" default="false">
+      Whether the item is hidden
+    </ParamField>
+    
+    <ParamField path="tooltip" type="string" optional>
+      Tooltip text
+    </ParamField>
+    
+    <ParamField path="submenu" type="Array<MenuItemConfig>" optional>
+      Nested submenu items
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### on
+
+Listen to tray events.
+
+```typescript
+tray.on(eventName, handler);
+```
+
+<ParamField path="eventName" type="'tray-clicked'" required>
+  Event name (currently only `tray-clicked` is supported)
+</ParamField>
+
+<ParamField path="handler" type="(event: unknown) => void" required>
+  Event handler function
+</ParamField>
+
+### remove
+
+Remove the tray icon.
+
+```typescript
+tray.remove();
+```
+
+## Static Methods
+
+### Tray.getById
+
+Get a tray instance by its ID.
+
+```typescript
+const tray = Tray.getById(id);
+```
+
+<ParamField path="id" type="number" required>
+  Tray ID
+</ParamField>
+
+<ResponseField name="return" type="Tray | undefined">
+  Tray instance or undefined if not found
+</ResponseField>
+
+### Tray.getAll
+
+Get all active tray instances.
+
+```typescript
+const trays = Tray.getAll();
+```
+
+<ResponseField name="return" type="Tray[]">
+  Array of all active tray instances
+</ResponseField>
+
+### Tray.removeById
+
+Remove a tray by its ID.
+
+```typescript
+Tray.removeById(id);
+```
+
+<ParamField path="id" type="number" required>
+  Tray ID to remove
+</ParamField>
+
+## Events
+
+### tray-clicked
+
+Emitted when a tray menu item is clicked.
+
+```typescript
+tray.on('tray-clicked', (event) => {
+  console.log('Action:', event.action);
+  console.log('Data:', event.data);
+});
+```
+
+## Notes
+
+- System tray functionality may not be available on all platforms
+- Template images automatically adapt to the system theme on macOS
+- Use high-resolution images for better display on retina displays
+
+## Related
+
+- [Application Menu](/api/application-menu) - Create application menus
+- [Context Menu](/api/context-menu) - Show context menus

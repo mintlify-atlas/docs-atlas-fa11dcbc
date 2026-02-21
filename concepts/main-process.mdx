@@ -1,0 +1,505 @@
+---
+title: Main Process
+description: Understanding the Bun-powered main process that controls your Electrobun application
+---
+
+# Main Process
+
+The **main process** is the heart of your Electrobun application. It runs on the **Bun runtime** and has full access to system resources, native APIs, and controls the application lifecycle.
+
+## What is the Main Process?
+
+The main process is a Node.js/Bun environment that:
+
+- Executes your backend TypeScript/JavaScript code
+- Manages application lifecycle (startup, shutdown, updates)
+- Creates and controls windows and webviews
+- Handles file system operations, network requests, and databases
+- Provides native integrations (menus, trays, dialogs, notifications)
+- Communicates with webview processes via RPC
+
+<Info>
+Think of the main process as your application's **backend server** that also controls the UI windows.
+</Info>
+
+## Entry Point
+
+Your main process code starts from the entry point defined in `electrobun.config.ts`:
+
+```typescript title="electrobun.config.ts"
+export default {
+  app: {
+    name: "my-app",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+  },
+};
+```
+
+```typescript title="src/bun/index.ts"
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+// This code runs when your app starts
+const mainWindow = new BrowserWindow({
+  title: "My App",
+  url: "views://mainview/index.html",
+  frame: { width: 800, height: 600, x: 100, y: 100 },
+});
+
+mainWindow.on("close", () => {
+  Utils.quit();
+});
+
+console.log("App started!");
+```
+
+## Core APIs
+
+### BrowserWindow
+
+Create and manage application windows:
+
+```typescript
+import { BrowserWindow } from "electrobun/bun";
+
+const window = new BrowserWindow({
+  title: "My Window",
+  url: "views://mainview/index.html",
+  frame: {
+    width: 1024,
+    height: 768,
+    x: 100,
+    y: 100,
+  },
+  titleBarStyle: "hiddenInset", // Custom title bar
+  transparent: false,
+  renderer: "native", // or "cef"
+});
+
+// Window controls
+window.setTitle("New Title");
+window.maximize();
+window.minimize();
+window.setFullScreen(true);
+window.setAlwaysOnTop(true);
+window.close();
+
+// Window state
+const isMaximized = window.isMaximized();
+const isMinimized = window.isMinimized();
+const frame = window.getFrame(); // { x, y, width, height }
+
+// Window events
+window.on("close", (event) => {
+  console.log("Window closed");
+});
+```
+
+<Tip>
+Use `titleBarStyle: "hiddenInset"` for a modern look with custom title bar content while keeping native window controls.
+</Tip>
+
+### BrowserView
+
+Create standalone webviews or embed them in windows:
+
+```typescript
+import { BrowserView } from "electrobun/bun";
+
+const view = new BrowserView({
+  url: "https://example.com",
+  frame: { x: 0, y: 0, width: 800, height: 600 },
+  preload: "path/to/preload.js",
+  sandbox: true, // For untrusted content
+  navigationRules: JSON.stringify([
+    { type: "allow", pattern: "https://example.com/*" },
+    { type: "deny", pattern: "*" },
+  ]),
+});
+
+// Navigation
+view.loadURL("https://new-url.com");
+view.loadHTML("<h1>Hello World</h1>");
+
+// Developer tools
+view.openDevTools();
+view.closeDevTools();
+view.toggleDevTools();
+
+// Search in page
+view.findInPage("search term", { forward: true, matchCase: false });
+view.stopFindInPage();
+
+// Navigation events
+view.on("will-navigate", (event) => {
+  console.log("Navigating to:", event.url);
+});
+
+view.on("did-navigate", (event) => {
+  console.log("Navigation complete");
+});
+
+view.on("dom-ready", (event) => {
+  console.log("DOM is ready");
+});
+```
+
+### Application Menu
+
+Create native menus:
+
+```typescript
+import { ApplicationMenu } from "electrobun/bun";
+
+ApplicationMenu.setMenu([
+  {
+    label: "File",
+    submenu: [
+      {
+        label: "New File",
+        accelerator: "CmdOrCtrl+N",
+        click: () => {
+          console.log("New file clicked");
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Quit",
+        accelerator: "CmdOrCtrl+Q",
+        role: "quit",
+      },
+    ],
+  },
+  {
+    label: "Edit",
+    submenu: [
+      { label: "Undo", accelerator: "CmdOrCtrl+Z", role: "undo" },
+      { label: "Redo", accelerator: "CmdOrCtrl+Shift+Z", role: "redo" },
+      { type: "separator" },
+      { label: "Cut", accelerator: "CmdOrCtrl+X", role: "cut" },
+      { label: "Copy", accelerator: "CmdOrCtrl+C", role: "copy" },
+      { label: "Paste", accelerator: "CmdOrCtrl+V", role: "paste" },
+    ],
+  },
+]);
+```
+
+### Context Menu
+
+Create right-click context menus:
+
+```typescript
+import { ContextMenu } from "electrobun/bun";
+
+// Show context menu at cursor position
+ContextMenu.show([
+  {
+    label: "Cut",
+    accelerator: "CmdOrCtrl+X",
+    click: () => console.log("Cut"),
+  },
+  {
+    label: "Copy",
+    accelerator: "CmdOrCtrl+C",
+    click: () => console.log("Copy"),
+  },
+  { type: "separator" },
+  {
+    label: "Delete",
+    click: () => console.log("Delete"),
+  },
+]);
+```
+
+### System Tray
+
+Add your app to the system tray:
+
+```typescript
+import { Tray } from "electrobun/bun";
+
+const tray = new Tray({
+  icon: "path/to/icon.png",
+  tooltip: "My App",
+  menu: [
+    {
+      label: "Show Window",
+      click: () => mainWindow.show(),
+    },
+    { type: "separator" },
+    {
+      label: "Quit",
+      click: () => Utils.quit(),
+    },
+  ],
+});
+
+tray.setIcon("path/to/new-icon.png");
+tray.setTooltip("New tooltip");
+```
+
+### Utilities
+
+Common utility functions:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Application control
+Utils.quit();
+
+// Dialogs
+const result = await Utils.showMessageBox({
+  type: "question",
+  title: "Confirm",
+  message: "Are you sure?",
+  buttons: ["Yes", "No"],
+  defaultButton: 0,
+});
+
+if (result.response === 0) {
+  console.log("User clicked Yes");
+}
+
+// Notifications
+Utils.showNotification({
+  title: "Hello!",
+  body: "This is a notification",
+  icon: "path/to/icon.png",
+});
+```
+
+### Paths
+
+Access common system paths:
+
+```typescript
+import { PATHS } from "electrobun/bun";
+
+console.log(PATHS.home);        // User's home directory
+console.log(PATHS.appData);     // App data directory
+console.log(PATHS.userData);    // User data directory
+console.log(PATHS.temp);        // Temporary directory
+console.log(PATHS.downloads);   // Downloads directory
+console.log(PATHS.documents);   // Documents directory
+console.log(PATHS.desktop);     // Desktop directory
+```
+
+### Screen
+
+Get display information:
+
+```typescript
+import { Screen } from "electrobun/bun";
+
+const displays = Screen.getAllDisplays();
+console.log(displays);
+// [{ id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 }, ... }]
+
+const primaryDisplay = Screen.getPrimaryDisplay();
+console.log(primaryDisplay);
+
+const cursorPosition = Screen.getCursorScreenPoint();
+console.log(cursorPosition); // { x: 500, y: 300 }
+```
+
+### Global Shortcuts
+
+Register system-wide keyboard shortcuts:
+
+```typescript
+import { GlobalShortcut } from "electrobun/bun";
+
+// Register shortcut
+GlobalShortcut.register("CommandOrControl+Shift+K", () => {
+  console.log("Global shortcut triggered!");
+  mainWindow.show();
+});
+
+// Unregister shortcut
+GlobalShortcut.unregister("CommandOrControl+Shift+K");
+
+// Unregister all
+GlobalShortcut.unregisterAll();
+
+// Check if registered
+const isRegistered = GlobalShortcut.isRegistered("CommandOrControl+Shift+K");
+```
+
+## Working with Bun APIs
+
+Since the main process runs on Bun, you have access to all Bun APIs:
+
+```typescript
+// File system (Bun-optimized)
+import { file } from "bun";
+
+const data = await Bun.file("data.json").json();
+await Bun.write("output.txt", "Hello World");
+
+// SQLite database (built-in)
+import { Database } from "bun:sqlite";
+
+const db = new Database("mydb.sqlite");
+db.run("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)");
+db.run("INSERT INTO users (name) VALUES (?)", ["Alice"]);
+const users = db.query("SELECT * FROM users").all();
+
+// HTTP server
+Bun.serve({
+  port: 3000,
+  fetch(req) {
+    return new Response("Hello from Bun!");
+  },
+});
+
+// WebSocket server
+Bun.serve({
+  port: 3001,
+  websocket: {
+    message(ws, message) {
+      ws.send(`Echo: ${message}`);
+    },
+  },
+});
+```
+
+<Note>
+Bun provides built-in SQLite, fetch, WebSockets, and more - no additional dependencies needed!
+</Note>
+
+## Application Lifecycle
+
+### Startup
+
+```typescript
+import { BrowserWindow, events } from "electrobun/bun";
+
+// App starts here
+console.log("Application starting...");
+
+// Initialize your app
+const mainWindow = new BrowserWindow({ /* ... */ });
+
+// Listen for ready event
+events.on("ready", () => {
+  console.log("Application is ready");
+});
+```
+
+### Shutdown
+
+```typescript
+import { Utils, events } from "electrobun/bun";
+
+// Listen for before-quit event
+events.on("before-quit", () => {
+  console.log("Application is about to quit");
+  // Cleanup code here
+});
+
+// Quit the application
+Utils.quit();
+```
+
+### Build Configuration
+
+Control runtime behavior:
+
+```typescript
+import { BuildConfig } from "electrobun/bun";
+
+const config = await BuildConfig.get();
+
+console.log(config.app.name);              // "my-app"
+console.log(config.app.version);           // "1.0.0"
+console.log(config.defaultRenderer);       // "native" or "cef"
+console.log(config.runtime.exitOnLastWindowClosed); // true/false
+```
+
+## Best Practices
+
+### 1. Separate Concerns
+
+Keep main process logic separate from UI logic:
+
+```typescript
+// ✅ Good: Main process handles business logic
+const rpc = BrowserView.defineRPC({
+  handlers: {
+    requests: {
+      async saveFile({ path, content }) {
+        await Bun.write(path, content);
+        return { success: true };
+      },
+    },
+  },
+});
+
+// ❌ Bad: Don't put business logic in webview
+// Webview should only handle UI interactions
+```
+
+### 2. Handle Errors Gracefully
+
+```typescript
+try {
+  const data = await Bun.file("config.json").json();
+} catch (error) {
+  console.error("Failed to load config:", error);
+  // Show error dialog to user
+  await Utils.showMessageBox({
+    type: "error",
+    title: "Error",
+    message: "Failed to load configuration file",
+  });
+}
+```
+
+### 3. Use Events for Decoupling
+
+```typescript
+import { events } from "electrobun/bun";
+
+// Emit custom events
+events.emit("user-logged-in", { userId: 123 });
+
+// Listen for events
+events.on("user-logged-in", (data) => {
+  console.log("User logged in:", data.userId);
+});
+```
+
+### 4. Clean Up Resources
+
+```typescript
+let serverInstance: any = null;
+
+// Start server
+serverInstance = Bun.serve({ /* ... */ });
+
+// Clean up on quit
+events.on("before-quit", () => {
+  if (serverInstance) {
+    serverInstance.stop();
+  }
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Webview Process" icon="window" href="/concepts/webview-process">
+    Learn how to create and manage webviews
+  </Card>
+  <Card title="RPC Communication" icon="arrows-left-right" href="/concepts/rpc-communication">
+    Master communication between processes
+  </Card>
+</CardGroup>

@@ -1,0 +1,185 @@
+---
+title: 'Context Menu'
+description: 'Show native context menus'
+icon: 'ellipsis-vertical'
+---
+
+The `ContextMenu` module provides functions to show native context menus (right-click menus) at the current cursor position.
+
+## showContextMenu
+
+Show a context menu at the current cursor position.
+
+```typescript
+import { ContextMenu } from 'electrobun/bun';
+
+ContextMenu.showContextMenu(menu);
+```
+
+<ParamField path="menu" type="Array<ApplicationMenuItemConfig>" required>
+  Array of menu item configurations
+  
+  <Expandable title="ApplicationMenuItemConfig">
+    <ParamField path="type" type="'normal' | 'divider' | 'separator'" default="'normal'">
+      Menu item type
+    </ParamField>
+    
+    <ParamField path="label" type="string" optional>
+      Menu item label (required for normal items unless using role)
+    </ParamField>
+    
+    <ParamField path="action" type="string" optional>
+      Action identifier to emit when clicked (cannot be used with role)
+    </ParamField>
+    
+    <ParamField path="role" type="string" optional>
+      Built-in menu role (e.g., 'copy', 'paste'). Cannot be used with action.
+    </ParamField>
+    
+    <ParamField path="data" type="any" optional>
+      Custom data to pass with the action
+    </ParamField>
+    
+    <ParamField path="enabled" type="boolean" default="true">
+      Whether the item is enabled
+    </ParamField>
+    
+    <ParamField path="checked" type="boolean" default="false">
+      Whether the item is checked (for checkbox items)
+    </ParamField>
+    
+    <ParamField path="hidden" type="boolean" default="false">
+      Whether the item is hidden
+    </ParamField>
+    
+    <ParamField path="tooltip" type="string" optional>
+      Tooltip text
+    </ParamField>
+    
+    <ParamField path="accelerator" type="string" optional>
+      Keyboard shortcut display (e.g., 'Ctrl+C')
+    </ParamField>
+    
+    <ParamField path="submenu" type="Array<ApplicationMenuItemConfig>" optional>
+      Nested submenu items
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## on
+
+Listen to context menu events.
+
+```typescript
+ContextMenu.on(eventName, handler);
+```
+
+<ParamField path="eventName" type="'context-menu-clicked'" required>
+  Event name
+</ParamField>
+
+<ParamField path="handler" type="(event: unknown) => void" required>
+  Event handler function
+</ParamField>
+
+## Example
+
+```typescript
+import { ContextMenu } from 'electrobun/bun';
+
+// Show context menu on right-click
+ContextMenu.showContextMenu([
+  {
+    label: 'Cut',
+    role: 'cut',
+  },
+  {
+    label: 'Copy',
+    role: 'copy',
+  },
+  {
+    label: 'Paste',
+    role: 'paste',
+  },
+  {
+    type: 'divider',
+  },
+  {
+    label: 'Inspect Element',
+    action: 'inspect',
+  },
+]);
+
+// Handle custom actions
+ContextMenu.on('context-menu-clicked', (event) => {
+  if (event.action === 'inspect') {
+    mainWindow.webview.openDevTools();
+  }
+});
+```
+
+## Built-in Menu Roles
+
+Context menu items can use built-in roles:
+
+- `copy` - Copy selected text
+- `paste` - Paste from clipboard
+- `cut` - Cut selected text
+- `selectAll` - Select all content
+- `undo` - Undo last action
+- `redo` - Redo last undone action
+
+Roles automatically provide appropriate labels and functionality.
+
+## Use Cases
+
+### Custom Context Menu
+
+Replace the default browser context menu:
+
+```typescript
+window.webview.on('context-menu', (event) => {
+  ContextMenu.showContextMenu([
+    { label: 'Custom Action 1', action: 'action1' },
+    { label: 'Custom Action 2', action: 'action2' },
+  ]);
+});
+```
+
+### Conditional Menu Items
+
+Show different menu items based on context:
+
+```typescript
+const hasSelection = await checkSelection();
+
+ContextMenu.showContextMenu([
+  {
+    label: 'Copy',
+    role: 'copy',
+    enabled: hasSelection,
+  },
+  {
+    label: 'Paste',
+    role: 'paste',
+  },
+]);
+```
+
+## Events
+
+### context-menu-clicked
+
+Emitted when a context menu item with an action is clicked.
+
+```typescript
+ContextMenu.on('context-menu-clicked', (event) => {
+  console.log('Action:', event.action);
+  console.log('Data:', event.data);
+});
+```
+
+## Related
+
+- [Application Menu](/api/application-menu) - Create application menus
+- [Tray](/api/tray) - Create system tray icons

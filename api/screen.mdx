@@ -1,0 +1,299 @@
+---
+title: 'Screen'
+description: 'Get information about displays and cursor position'
+icon: 'desktop'
+---
+
+The `Screen` module provides information about connected displays and cursor position.
+
+## getPrimaryDisplay
+
+Get information about the primary display.
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+const display = Screen.getPrimaryDisplay();
+```
+
+<ResponseField name="return" type="Display">
+  <Expandable title="Display object">
+    <ResponseField name="id" type="number">
+      Unique display identifier
+    </ResponseField>
+    <ResponseField name="bounds" type="Rectangle">
+      Display bounds (full screen area)
+      <Expandable title="Rectangle">
+        <ResponseField name="x" type="number">
+          X coordinate
+        </ResponseField>
+        <ResponseField name="y" type="number">
+          Y coordinate
+        </ResponseField>
+        <ResponseField name="width" type="number">
+          Width in pixels
+        </ResponseField>
+        <ResponseField name="height" type="number">
+          Height in pixels
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    <ResponseField name="workArea" type="Rectangle">
+      Work area (screen area excluding taskbar/menu bar)
+    </ResponseField>
+    <ResponseField name="scaleFactor" type="number">
+      Display scale factor (1.0 for standard, 2.0 for Retina, etc.)
+    </ResponseField>
+    <ResponseField name="isPrimary" type="boolean">
+      Whether this is the primary display
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## getAllDisplays
+
+Get information about all connected displays.
+
+```typescript
+const displays = Screen.getAllDisplays();
+```
+
+<ResponseField name="return" type="Display[]">
+  Array of all connected displays
+</ResponseField>
+
+## getCursorScreenPoint
+
+Get the current cursor position in screen coordinates.
+
+```typescript
+const position = Screen.getCursorScreenPoint();
+```
+
+<ResponseField name="return" type="Point">
+  <Expandable title="Point object">
+    <ResponseField name="x" type="number">
+      X coordinate in screen pixels
+    </ResponseField>
+    <ResponseField name="y" type="number">
+      Y coordinate in screen pixels
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Get Display Information
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+const primary = Screen.getPrimaryDisplay();
+console.log('Primary display:');
+console.log(`  Size: ${primary.bounds.width}x${primary.bounds.height}`);
+console.log(`  Work area: ${primary.workArea.width}x${primary.workArea.height}`);
+console.log(`  Scale factor: ${primary.scaleFactor}`);
+console.log(`  Position: (${primary.bounds.x}, ${primary.bounds.y})`);
+```
+
+### Center Window on Display
+
+```typescript
+import { Screen, BrowserWindow } from 'electrobun/bun';
+
+const display = Screen.getPrimaryDisplay();
+const windowWidth = 800;
+const windowHeight = 600;
+
+const window = new BrowserWindow({
+  frame: {
+    x: display.bounds.x + (display.bounds.width - windowWidth) / 2,
+    y: display.bounds.y + (display.bounds.height - windowHeight) / 2,
+    width: windowWidth,
+    height: windowHeight,
+  },
+});
+```
+
+### Multi-Monitor Setup
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+const displays = Screen.getAllDisplays();
+
+console.log(`Connected displays: ${displays.length}`);
+
+displays.forEach((display, index) => {
+  console.log(`\nDisplay ${index + 1}:`);
+  console.log(`  Primary: ${display.isPrimary}`);
+  console.log(`  Bounds: ${display.bounds.width}x${display.bounds.height}`);
+  console.log(`  Position: (${display.bounds.x}, ${display.bounds.y})`);
+  console.log(`  Scale: ${display.scaleFactor}x`);
+});
+```
+
+### Track Cursor Position
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+setInterval(() => {
+  const cursor = Screen.getCursorScreenPoint();
+  console.log(`Cursor at: (${cursor.x}, ${cursor.y})`);
+}, 1000);
+```
+
+### Find Display for Point
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+function getDisplayAtPoint(x: number, y: number) {
+  const displays = Screen.getAllDisplays();
+  
+  return displays.find(display => {
+    const { bounds } = display;
+    return (
+      x >= bounds.x &&
+      x < bounds.x + bounds.width &&
+      y >= bounds.y &&
+      y < bounds.y + bounds.height
+    );
+  });
+}
+
+const cursor = Screen.getCursorScreenPoint();
+const display = getDisplayAtPoint(cursor.x, cursor.y);
+
+if (display) {
+  console.log(`Cursor is on display ${display.id}`);
+}
+```
+
+### High-DPI / Retina Display Detection
+
+```typescript
+import { Screen } from 'electrobun/bun';
+
+const primary = Screen.getPrimaryDisplay();
+
+if (primary.scaleFactor > 1) {
+  console.log(`High-DPI display detected (${primary.scaleFactor}x)`);
+  // Use high-resolution assets
+} else {
+  console.log('Standard display');
+  // Use standard assets
+}
+```
+
+## Use Cases
+
+### Window Positioning
+
+Position windows intelligently based on display configuration:
+
+```typescript
+function createWindowOnDisplay(displayIndex: number) {
+  const displays = Screen.getAllDisplays();
+  const display = displays[displayIndex] || Screen.getPrimaryDisplay();
+  
+  return new BrowserWindow({
+    frame: {
+      x: display.workArea.x + 50,
+      y: display.workArea.y + 50,
+      width: 800,
+      height: 600,
+    },
+  });
+}
+```
+
+### Full-Screen on Specific Display
+
+```typescript
+function openFullscreenOnSecondary() {
+  const displays = Screen.getAllDisplays();
+  const secondary = displays.find(d => !d.isPrimary);
+  
+  if (secondary) {
+    const window = new BrowserWindow({
+      frame: {
+        x: secondary.bounds.x,
+        y: secondary.bounds.y,
+        width: secondary.bounds.width,
+        height: secondary.bounds.height,
+      },
+    });
+    window.setFullScreen(true);
+  }
+}
+```
+
+### Responsive Window Sizing
+
+```typescript
+function createResponsiveWindow() {
+  const primary = Screen.getPrimaryDisplay();
+  const { workArea } = primary;
+  
+  // Use 80% of work area
+  const width = Math.floor(workArea.width * 0.8);
+  const height = Math.floor(workArea.height * 0.8);
+  
+  return new BrowserWindow({
+    frame: {
+      x: workArea.x + Math.floor((workArea.width - width) / 2),
+      y: workArea.y + Math.floor((workArea.height - height) / 2),
+      width,
+      height,
+    },
+  });
+}
+```
+
+## Types
+
+### Display
+
+```typescript
+interface Display {
+  id: number;
+  bounds: Rectangle;
+  workArea: Rectangle;
+  scaleFactor: number;
+  isPrimary: boolean;
+}
+```
+
+### Rectangle
+
+```typescript
+interface Rectangle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+```
+
+### Point
+
+```typescript
+interface Point {
+  x: number;
+  y: number;
+}
+```
+
+## Notes
+
+- Display coordinates use screen space (may span negative values in multi-monitor setups)
+- The `workArea` excludes space used by the taskbar, dock, or menu bar
+- Scale factors are important for high-DPI (Retina) displays
+- Display configuration can change at runtime (connect/disconnect monitors)
+
+## Related
+
+- [BrowserWindow](/api/browser-window) - Window positioning and sizing
+- [Utils](/api/utils) - Utility functions

@@ -1,0 +1,344 @@
+---
+title: 'createRPC'
+description: 'Low-level function to create custom RPC instances with full control over transport and handlers'
+icon: 'code'
+---
+
+## Overview
+
+`createRPC` is the low-level function that powers Electrobun's RPC system. It provides complete control over the transport layer and handler configuration.
+
+<Note>
+Most Electrobun apps should use [`defineElectrobunRPC`](/api/define-electrobun-rpc) instead, which wraps `createRPC` with sensible defaults for Electrobun's architecture.
+</Note>
+
+## Import
+
+```typescript
+import { createRPC } from "electrobun/shared/rpc";
+```
+
+## Type Signature
+
+```typescript
+function createRPC<
+  Schema extends RPCSchema = RPCSchema,
+  RemoteSchema extends RPCSchema = Schema
+>(options?: RPCOptions<Schema, RemoteSchema>): RPCInstance<Schema, RemoteSchema>
+```
+
+## Parameters
+
+<ParamField path="options" type="RPCOptions<Schema, RemoteSchema>" optional>
+  Configuration object for the RPC instance
+
+  <Expandable title="properties">
+    <ParamField path="transport" type="RPCTransport" optional>
+      Custom transport layer for sending/receiving messages
+
+      <Expandable title="properties">
+        <ParamField path="send" type="(data: any) => void" optional>
+          Function to send data to the remote process
+        </ParamField>
+        <ParamField path="registerHandler" type="(handler: RPCTransportHandler) => void" optional>
+          Function to register a handler for incoming messages
+        </ParamField>
+        <ParamField path="unregisterHandler" type="() => void" optional>
+          Function to cleanup the transport handler
+        </ParamField>
+      </Expandable>
+    </ParamField>
+
+    <ParamField path="requestHandler" type="RPCRequestHandler<Schema['requests']>" optional>
+      Handler for incoming requests. Can be a function or object:
+
+      ```typescript
+      // Function handler
+      requestHandler: (method, params) => {
+        if (method === "saveFile") {
+          return { success: true };
+        }
+      }
+
+      // Object handler (recommended)
+      requestHandler: {
+        saveFile: (params) => ({ success: true }),
+        deleteFile: (params) => ({ success: true }),
+        _: (method, params) => { /* fallback */ }
+      }
+      ```
+    </ParamField>
+
+    <ParamField path="maxRequestTime" type="number" default="1000">
+      Timeout in milliseconds for requests before they fail
+    </ParamField>
+
+    <ParamField path="_debugHooks" type="DebugHooks" optional>
+      Internal debugging hooks (not recommended for production use)
+
+      <Expandable title="properties">
+        <ParamField path="onSend" type="(packet: RPCPacket) => void" optional>
+          Called before each outgoing packet
+        </ParamField>
+        <ParamField path="onReceive" type="(packet: RPCPacket) => void" optional>
+          Called after each incoming packet
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Return Value
+
+Returns an `RPCInstance` object with the following methods and properties:
+
+### Methods
+
+<ResponseField name="setTransport" type="(transport: RPCTransport) => void">
+  Updates the transport layer dynamically
+</ResponseField>
+
+<ResponseField name="setRequestHandler" type="(handler: RPCRequestHandler) => void">
+  Updates the request handler dynamically
+</ResponseField>
+
+<ResponseField name="request" type="RPCRequestsProxy<RemoteSchema['requests']>">
+  Makes type-safe requests to the remote process:
+
+  ```typescript
+  const result = await rpc.request.saveFile({ path: "/file.txt", data: "..." });
+  // OR
+  const result = await rpc.request("saveFile", { path: "/file.txt", data: "..." });
+  ```
+</ResponseField>
+
+<ResponseField name="send" type="RPCMessagesProxy<Schema['messages']>">
+  Sends fire-and-forget messages:
+
+  ```typescript
+  rpc.send.notifyUpdate({ version: "1.0.0" });
+  // OR
+  rpc.send("notifyUpdate", { version: "1.0.0" });
+  ```
+</ResponseField>
+
+<ResponseField name="addMessageListener" type="function">
+  Registers a listener for incoming messages:
+
+  ```typescript
+  // Listen to specific message
+  rpc.addMessageListener("fileChanged", (data) => {
+    console.log("File:", data.path);
+  });
+
+  // Listen to all messages (wildcard)
+  rpc.addMessageListener("*", (messageName, payload) => {
+    console.log(`Message ${messageName}:`, payload);
+  });
+  ```
+</ResponseField>
+
+<ResponseField name="removeMessageListener" type="function">
+  Removes a previously registered message listener
+</ResponseField>
+
+<ResponseField name="proxy" type="{ send: RPCMessagesProxy, request: RPCRequestsProxy }">
+  Convenience object containing both `send` and `request` proxies
+</ResponseField>
+
+## Schema Definition
+
+Define your RPC schema with TypeScript to get full type safety:
+
+```typescript
+import { type RPCSchema } from "electrobun/bun";
+
+// Define what each side can do
+type MySchema = {
+  requests: {
+    // Method name
+    saveFile: {
+      params: { path: string; content: string };
+      response: { success: boolean; size: number };
+    };
+    deleteFile: {
+      params: { path: string };
+      response: void; // No return value
+    };
+  };
+  messages: {
+    // Message name and payload type
+    fileChanged: { path: string };
+    progressUpdate: { percent: number };
+    notification: void; // No payload
+  };
+};
+
+type MyRPCSchema = RPCSchema<MySchema>;
+```
+
+## Examples
+
+### Basic Usage
+
+```typescript
+import { createRPC, type RPCSchema } from "electrobun/shared/rpc";
+
+type Schema = RPCSchema<{
+  requests: {
+    add: {
+      params: { a: number; b: number };
+      response: number;
+    };
+  };
+  messages: {
+    result: number;
+  };
+}>;
+
+const rpc = createRPC<Schema>({
+  maxRequestTime: 5000,
+  requestHandler: {
+    add: ({ a, b }) => a + b
+  }
+});
+
+// Make request
+const sum = await rpc.request.add({ a: 5, b: 3 });
+console.log(sum); // 8
+
+// Listen for messages
+rpc.addMessageListener("result", (value) => {
+  console.log("Result:", value);
+});
+```
+
+### Custom Transport
+
+```typescript
+import { createRPC, type RPCTransport } from "electrobun/shared/rpc";
+
+// Create custom transport (e.g., WebSocket)
+const customTransport: RPCTransport = {
+  send: (data) => {
+    websocket.send(JSON.stringify(data));
+  },
+  registerHandler: (handler) => {
+    websocket.onmessage = (event) => {
+      handler(JSON.parse(event.data));
+    };
+  },
+  unregisterHandler: () => {
+    websocket.onmessage = null;
+  }
+};
+
+const rpc = createRPC({
+  transport: customTransport,
+  requestHandler: {
+    ping: () => "pong"
+  }
+});
+```
+
+### Dynamic Transport Updates
+
+```typescript
+const rpc = createRPC();
+
+// Set transport later
+rpc.setTransport({
+  send: (data) => window.postMessage(data, "*"),
+  registerHandler: (handler) => {
+    window.addEventListener("message", (e) => handler(e.data));
+  }
+});
+
+// Update handler dynamically
+rpc.setRequestHandler({
+  newMethod: () => ({ status: "ok" })
+});
+```
+
+### Error Handling
+
+```typescript
+const rpc = createRPC<Schema>({
+  requestHandler: {
+    riskyOperation: async (params) => {
+      if (!params.valid) {
+        throw new Error("Invalid parameters");
+      }
+      return { success: true };
+    }
+  }
+});
+
+// Errors are automatically caught and sent as error responses
+try {
+  await rpc.request.riskyOperation({ valid: false });
+} catch (error) {
+  console.error("Request failed:", error.message);
+  // "Invalid parameters"
+}
+```
+
+### Request Timeouts
+
+```typescript
+const rpc = createRPC({
+  maxRequestTime: 2000, // 2 seconds
+  requestHandler: {
+    slowOperation: async () => {
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      return "done";
+    }
+  }
+});
+
+try {
+  await rpc.request.slowOperation();
+} catch (error) {
+  console.error(error.message);
+  // "RPC request timed out."
+}
+```
+
+## Advanced Features
+
+### Fallback Handler
+
+Handle unknown methods with a fallback:
+
+```typescript
+const rpc = createRPC<Schema>({
+  requestHandler: {
+    knownMethod: () => "ok",
+    _: (method, params) => {
+      console.log(`Unknown method: ${method}`);
+      throw new Error(`Method ${method} not implemented`);
+    }
+  }
+});
+```
+
+### Wildcard Message Listener
+
+Listen to all messages:
+
+```typescript
+rpc.addMessageListener("*", (messageName, payload) => {
+  console.log(`Received ${String(messageName)}:`, payload);
+});
+```
+
+## See Also
+
+<CardGroup cols={2}>
+  <Card title="defineElectrobunRPC" icon="bolt" href="/api/define-electrobun-rpc">
+    High-level helper for Electrobun apps
+  </Card>
+  <Card title="RPC Overview" icon="network-wired" href="/api/rpc-overview">
+    Learn about the RPC system architecture
+  </Card>
+</CardGroup>

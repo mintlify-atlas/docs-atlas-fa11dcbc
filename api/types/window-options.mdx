@@ -1,0 +1,124 @@
+---
+title: WindowOptions
+description: Configuration options for creating browser windows
+---
+
+## WindowOptionsType
+
+Configuration object used when creating a new `BrowserWindow` instance.
+
+### Properties
+
+<ParamField path="title" type="string" default="Electrobun">
+  The window title displayed in the title bar
+</ParamField>
+
+<ParamField path="frame" type="object" required>
+  The window's position and dimensions
+  
+  <Expandable title="properties">
+    <ParamField path="x" type="number" default="0">
+      Horizontal position in pixels from the left edge of the screen
+    </ParamField>
+    
+    <ParamField path="y" type="number" default="0">
+      Vertical position in pixels from the top edge of the screen
+    </ParamField>
+    
+    <ParamField path="width" type="number" default="800">
+      Window width in pixels
+    </ParamField>
+    
+    <ParamField path="height" type="number" default="600">
+      Window height in pixels
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="url" type="string | null" default="null">
+  URL to load in the window. Mutually exclusive with `html`
+</ParamField>
+
+<ParamField path="html" type="string | null" default="null">
+  HTML content to load in the window. Mutually exclusive with `url`
+</ParamField>
+
+<ParamField path="preload" type="string | null" default="null">
+  Path to a JavaScript file to execute before page scripts run
+</ParamField>
+
+<ParamField path="renderer" type="'native' | 'cef'" default="buildConfig.defaultRenderer">
+  Which rendering engine to use:
+  - `native`: WKWebView (macOS), WebView2 (Windows)
+  - `cef`: Chromium Embedded Framework
+</ParamField>
+
+<ParamField path="rpc" type="T" default="undefined">
+  RPC schema for communication between browser and Bun processes. Generic type parameter.
+</ParamField>
+
+<ParamField path="styleMask" type="object" default="{}">
+  macOS-specific window style configuration. See platform documentation for details.
+</ParamField>
+
+<ParamField path="titleBarStyle" type="'default' | 'hidden' | 'hiddenInset'" default="'default'">
+  Controls the window's title bar appearance:
+  - `default`: Normal title bar with native window controls
+  - `hidden`: No title bar, no native window controls (for fully custom chrome)
+  - `hiddenInset`: Transparent title bar with inset native controls
+</ParamField>
+
+<ParamField path="transparent" type="boolean" default="false">
+  When `true`, window background is transparent (see-through)
+</ParamField>
+
+<ParamField path="navigationRules" type="string | null" default="null">
+  JSON string defining URL navigation rules for the webview
+</ParamField>
+
+<ParamField path="sandbox" type="boolean" default="false">
+  Sandbox mode: when `true`, disables RPC and only allows event emission. Use for untrusted content (remote URLs) to prevent malicious sites from accessing internal APIs, creating OOPIFs, or communicating with Bun.
+</ParamField>
+
+## Usage Example
+
+```typescript
+import { BrowserWindow } from '@electrobun/core';
+
+const window = new BrowserWindow({
+  title: 'My Application',
+  frame: {
+    x: 100,
+    y: 100,
+    width: 1200,
+    height: 800
+  },
+  url: 'https://example.com',
+  titleBarStyle: 'hiddenInset',
+  transparent: false,
+  sandbox: false
+});
+```
+
+## Sandbox Mode
+
+When `sandbox` is set to `true`, the window operates in a restricted security mode:
+
+- RPC communication is disabled
+- Only event emission is allowed
+- Prevents untrusted content from accessing internal APIs
+- Blocks creation of out-of-process iframes (OOPIFs)
+
+This is recommended when loading remote URLs or untrusted content.
+
+```typescript
+const sandboxedWindow = new BrowserWindow({
+  url: 'https://untrusted-site.com',
+  sandbox: true // Enable sandbox for security
+});
+```
+
+## See Also
+
+- [BrowserWindow API](/api/browser-window)
+- [View Options](/api/types/view-options)

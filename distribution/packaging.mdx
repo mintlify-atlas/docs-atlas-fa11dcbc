@@ -1,0 +1,216 @@
+---
+title: Packaging
+description: Learn how to package Electrobun apps for macOS, Windows, and Linux distribution
+---
+
+Electrobun provides a unified build system that packages your app for all major platforms with platform-specific optimizations.
+
+## Build Command
+
+Package your app using the CLI:
+
+```bash
+bun electrobun build --env=stable
+```
+
+### Build Environments
+
+Electrobun supports three build environments:
+
+- **dev** - Development builds with debug symbols, no code signing
+- **canary** - Pre-release builds with optional signing
+- **stable** - Production builds with full code signing and notarization
+
+## Platform-Specific Formats
+
+### macOS
+
+Electrobun creates the following artifacts for macOS:
+
+<Steps>
+  <Step title="App Bundle (.app)">
+    Standard macOS application bundle with:
+    - `Contents/MacOS/` - Executable binaries (launcher, bun runtime)
+    - `Contents/Resources/` - App resources, JavaScript code
+    - `Contents/Frameworks/` - CEF framework (if bundleCEF is enabled)
+    - `Contents/Info.plist` - App metadata
+  </Step>
+
+  <Step title="Compressed Archive (.tar.zst)">
+    Zstandard-compressed tarball of the app bundle used for auto-updates. Generated from the signed and notarized .app bundle.
+  </Step>
+
+  <Step title="DMG Installer (.dmg)">
+    Disk image with drag-to-Applications installer containing:
+    - Self-extracting app bundle wrapper
+    - Symlink to /Applications folder
+    - Signed and notarized for Gatekeeper
+  </Step>
+</Steps>
+
+**Configuration:**
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    mac: {
+      bundleCEF: true,        // Include Chromium Embedded Framework
+      codesign: true,         // Sign the app bundle
+      notarize: true,         // Notarize with Apple
+      icons: "icon.iconset",  // Path to .iconset folder
+      entitlements: {
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+      },
+    },
+  },
+};
+```
+
+### Windows
+
+Windows builds produce:
+
+<Steps>
+  <Step title="Application Directory">
+    Folder structure containing:
+    - `bin/launcher.exe` - Main executable
+    - `bin/bun.exe` - Bun runtime
+    - `bin/*.dll` - Native libraries and WebView2Loader
+    - `Resources/` - App resources
+  </Step>
+
+  <Step title="Compressed Archive (.tar.zst)">
+    Zstandard-compressed archive for auto-updates.
+  </Step>
+
+  <Step title="Self-Extracting Installer (.zip)">
+    ZIP archive containing:
+    - Installer executable with embedded app archive
+    - Installation to `%LOCALAPPDATA%\\[identifier]\\[channel]\\`
+  </Step>
+</Steps>
+
+**Configuration:**
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    win: {
+      bundleCEF: true,      // Include CEF runtime
+      icon: "icon.ico",     // App icon (embedded in launcher.exe)
+    },
+  },
+};
+```
+
+### Linux
+
+Linux builds create:
+
+<Steps>
+  <Step title="Application Directory Bundle">
+    Directory structure:
+    - `bin/launcher` - Main executable
+    - `bin/bun` - Bun runtime
+    - `bin/*.so` - Native libraries
+    - `Resources/` - App resources
+    - `[AppName].desktop` - Desktop entry file
+  </Step>
+
+  <Step title="Compressed Archive (.tar.zst)">
+    Zstandard-compressed tarball for auto-updates.
+  </Step>
+
+  <Step title="Installer Archive (.tar.gz)">
+    Self-extracting installer that:
+    - Installs to `~/.local/share/[identifier]/[channel]/`
+    - Creates desktop shortcut with app icon
+    - Sets executable permissions
+  </Step>
+</Steps>
+
+**Configuration:**
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    linux: {
+      bundleCEF: true,             // Include CEF runtime
+      icon: "icon.png",            // App icon (256x256 PNG)
+    },
+  },
+};
+```
+
+## ASAR Packaging
+
+Electrobun supports ASAR (Electron Archive) format for packaging app resources:
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    useAsar: true,
+    asarUnpack: ["*.node", "*.dll"], // Patterns for files to exclude from ASAR
+  },
+};
+```
+
+**Benefits:**
+- Reduces file count and improves I/O performance
+- Provides basic obfuscation of JavaScript code
+- Supports selective unpacking for native modules
+
+## Custom Versions
+
+Override bundled Bun or CEF versions:
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    bunVersion: "1.3.7",  // Use specific Bun runtime version
+    cefVersion: "144.0.12+g1a1008c+chromium-144.0.7559.110",
+  },
+};
+```
+
+Custom versions are automatically downloaded from:
+- **Bun:** GitHub releases (oven-sh/bun)
+- **CEF:** Spotify CDN (cef-builds.spotifycdn.com)
+
+## Build Artifacts
+
+All artifacts are placed in the `artifacts/` folder with platform prefixes:
+
+```
+artifacts/
+├── stable-macos-arm64-MyApp.dmg
+├── stable-macos-arm64-MyApp.app.tar.zst
+├── stable-macos-arm64-[hash].patch
+├── stable-macos-arm64-update.json
+├── stable-win-x64-MyApp-Setup.zip
+├── stable-win-x64-MyApp.tar.zst
+└── stable-linux-x64-MyApp-Setup.tar.gz
+```
+
+## Build Hooks
+
+Customize the build process with lifecycle hooks:
+
+```typescript electrobun.config.ts
+export default {
+  scripts: {
+    preBuild: "./scripts/preBuild.ts",      // Before building
+    postBuild: "./scripts/postBuild.ts",    // After bundling code
+    postWrap: "./scripts/postWrap.ts",      // After creating wrapper
+    postPackage: "./scripts/postPackage.ts", // After all artifacts
+  },
+};
+```
+
+Hooks receive environment variables:
+- `ELECTROBUN_BUILD_ENV` - dev, canary, or stable
+- `ELECTROBUN_OS` - Target operating system
+- `ELECTROBUN_ARCH` - Target architecture
+- `ELECTROBUN_BUILD_DIR` - Build directory path
+- `ELECTROBUN_ARTIFACT_DIR` - Artifacts directory path

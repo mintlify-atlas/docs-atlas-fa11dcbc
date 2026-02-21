@@ -1,0 +1,367 @@
+---
+title: 'BrowserView'
+description: 'Manage web content views within browser windows'
+icon: 'browser'
+---
+
+The `BrowserView` class represents a web content view that can be embedded in a `BrowserWindow`. Each window automatically creates a BrowserView, or you can create additional views for advanced use cases.
+
+## Constructor
+
+Create a new browser view.
+
+```typescript
+const view = new BrowserView(options);
+```
+
+<ParamField path="options" type="Partial<BrowserViewOptions>" optional>
+  Configuration options for the view
+  
+  <Expandable title="BrowserViewOptions properties">
+    <ParamField path="url" type="string | null" default="null">
+      URL to load in the view. Use `views://` protocol for local views.
+    </ParamField>
+    
+    <ParamField path="html" type="string | null" default="null">
+      HTML content to load directly. Cannot be used with `url`.
+    </ParamField>
+    
+    <ParamField path="preload" type="string | null" default="null">
+      Path to a preload script
+    </ParamField>
+    
+    <ParamField path="renderer" type="'native' | 'cef'">
+      Rendering engine to use. Defaults to build config setting.
+    </ParamField>
+    
+    <ParamField path="partition" type="string | null" default="null">
+      Session partition ID for isolated storage
+    </ParamField>
+    
+    <ParamField path="frame" type="object" default="{x: 0, y: 0, width: 800, height: 600}">
+      View position and size within the window
+      <Expandable title="Frame properties">
+        <ParamField path="x" type="number">
+          View x position in pixels
+        </ParamField>
+        <ParamField path="y" type="number">
+          View y position in pixels
+        </ParamField>
+        <ParamField path="width" type="number">
+          View width in pixels
+        </ParamField>
+        <ParamField path="height" type="number">
+          View height in pixels
+        </ParamField>
+      </Expandable>
+    </ParamField>
+    
+    <ParamField path="rpc" type="T" optional>
+      RPC schema for communication between main and renderer process
+    </ParamField>
+    
+    <ParamField path="hostWebviewId" type="number" optional>
+      ID of parent webview if this is a nested view
+    </ParamField>
+    
+    <ParamField path="autoResize" type="boolean" default="true">
+      Whether the view should automatically resize with its window
+    </ParamField>
+    
+    <ParamField path="windowId" type="number" default="0">
+      ID of the window to attach this view to
+    </ParamField>
+    
+    <ParamField path="navigationRules" type="string | null" default="null">
+      JSON string of navigation rules to control which URLs can be loaded
+    </ParamField>
+    
+    <ParamField path="sandbox" type="boolean" default="false">
+      When true, disables RPC and only allows event emission. Use for untrusted content.
+    </ParamField>
+    
+    <ParamField path="startTransparent" type="boolean" default="false">
+      Set transparent on the view at creation (before first paint)
+    </ParamField>
+    
+    <ParamField path="startPassthrough" type="boolean" default="false">
+      Set passthrough (click-through) on the view at creation
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Example
+
+```typescript
+import { BrowserView } from 'electrobun/bun';
+
+// Access the window's default view
+const view = mainWindow.webview;
+
+// Create a standalone view
+const customView = new BrowserView({
+  url: 'https://example.com',
+  frame: { x: 0, y: 0, width: 800, height: 600 },
+  sandbox: true, // Disable RPC for untrusted content
+});
+```
+
+## Properties
+
+<ResponseField name="id" type="number">
+  Unique view identifier
+</ResponseField>
+
+<ResponseField name="ptr" type="Pointer">
+  Native pointer to the view object
+</ResponseField>
+
+<ResponseField name="url" type="string | null">
+  Current URL loaded in the view
+</ResponseField>
+
+<ResponseField name="html" type="string | null">
+  Current HTML content in the view
+</ResponseField>
+
+<ResponseField name="rpc" type="T | undefined">
+  RPC interface for communication with renderer
+</ResponseField>
+
+## Methods
+
+### loadURL
+
+Load a URL in the view.
+
+```typescript
+view.loadURL(url);
+```
+
+<ParamField path="url" type="string" required>
+  URL to load (including `views://` for local views)
+</ParamField>
+
+### loadHTML
+
+Load HTML content directly in the view.
+
+```typescript
+view.loadHTML(html);
+```
+
+<ParamField path="html" type="string" required>
+  HTML content to load
+</ParamField>
+
+### setNavigationRules
+
+Set navigation rules to control which URLs can be loaded.
+
+```typescript
+view.setNavigationRules(rules);
+```
+
+<ParamField path="rules" type="string[]" required>
+  Array of URL patterns or rules
+</ParamField>
+
+### executeJavascript
+
+Execute JavaScript in the view.
+
+```typescript
+view.executeJavascript(code);
+```
+
+<ParamField path="code" type="string" required>
+  JavaScript code to execute
+</ParamField>
+
+### findInPage
+
+Search for text in the page.
+
+```typescript
+view.findInPage(searchText, options);
+```
+
+<ParamField path="searchText" type="string" required>
+  Text to search for
+</ParamField>
+
+<ParamField path="options" type="object" optional>
+  Search options
+  <Expandable title="Options">
+    <ParamField path="forward" type="boolean" default="true">
+      Search forward or backward
+    </ParamField>
+    <ParamField path="matchCase" type="boolean" default="false">
+      Whether to match case
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### stopFindInPage
+
+Stop the current search operation.
+
+```typescript
+view.stopFindInPage();
+```
+
+### openDevTools
+
+Open developer tools for this view.
+
+```typescript
+view.openDevTools();
+```
+
+### closeDevTools
+
+Close developer tools.
+
+```typescript
+view.closeDevTools();
+```
+
+### toggleDevTools
+
+Toggle developer tools open/closed.
+
+```typescript
+view.toggleDevTools();
+```
+
+### on
+
+Listen to view events.
+
+```typescript
+view.on(eventName, handler);
+```
+
+<ParamField path="eventName" type="string" required>
+  Name of the event:
+  - `will-navigate`
+  - `did-navigate`
+  - `did-navigate-in-page`
+  - `did-commit-navigation`
+  - `dom-ready`
+  - `download-started`
+  - `download-progress`
+  - `download-completed`
+  - `download-failed`
+</ParamField>
+
+<ParamField path="handler" type="(event: unknown) => void" required>
+  Event handler function
+</ParamField>
+
+## Static Methods
+
+### BrowserView.getById
+
+Get a view instance by its ID.
+
+```typescript
+const view = BrowserView.getById(id);
+```
+
+<ParamField path="id" type="number" required>
+  View ID
+</ParamField>
+
+<ResponseField name="return" type="BrowserView | undefined">
+  View instance or undefined if not found
+</ResponseField>
+
+### BrowserView.getAll
+
+Get all active view instances.
+
+```typescript
+const views = BrowserView.getAll();
+```
+
+<ResponseField name="return" type="BrowserView[]">
+  Array of all active views
+</ResponseField>
+
+### BrowserView.defineRPC
+
+Define an RPC schema for views.
+
+```typescript
+const rpc = BrowserView.defineRPC(config);
+```
+
+<ParamField path="config" type="ElectrobunRPCConfig" required>
+  RPC configuration with handlers
+</ParamField>
+
+<ResponseField name="return" type="RPCWithTransport">
+  RPC instance
+</ResponseField>
+
+## Events
+
+### will-navigate
+
+Emitted before navigation starts.
+
+```typescript
+view.on('will-navigate', (event) => {
+  console.log('Navigating to:', event.url);
+});
+```
+
+### did-navigate
+
+Emitted after navigation completes.
+
+```typescript
+view.on('did-navigate', (event) => {
+  console.log('Navigated to:', event.url);
+});
+```
+
+### did-navigate-in-page
+
+Emitted for in-page navigation (anchor links, pushState).
+
+```typescript
+view.on('did-navigate-in-page', (event) => {
+  console.log('In-page navigation');
+});
+```
+
+### dom-ready
+
+Emitted when DOM is ready.
+
+```typescript
+view.on('dom-ready', () => {
+  console.log('DOM ready');
+});
+```
+
+### download-started / download-progress / download-completed / download-failed
+
+Emitted during download operations.
+
+```typescript
+view.on('download-started', (event) => {
+  console.log('Download started:', event);
+});
+
+view.on('download-progress', (event) => {
+  console.log('Progress:', event.percent);
+});
+```
+
+## Related
+
+- [BrowserWindow](/api/browser-window) - Create and manage windows
+- [Session](/api/session) - Manage cookies and storage

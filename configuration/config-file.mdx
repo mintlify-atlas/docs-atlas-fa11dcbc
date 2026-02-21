@@ -1,0 +1,216 @@
+---
+title: Configuration File
+description: Overview of the electrobun.config.ts file and basic setup
+---
+
+## Overview
+
+The `electrobun.config.ts` file is the central configuration file for your Electrobun application. It defines application metadata, build options, platform-specific settings, runtime behavior, and release configuration.
+
+## File Location
+
+The configuration file must be named `electrobun.config.ts` and placed in the root of your project:
+
+```
+your-app/
+├── electrobun.config.ts
+├── src/
+│   ├── bun/
+│   └── mainview/
+└── package.json
+```
+
+## Basic Structure
+
+A minimal configuration file looks like this:
+
+```typescript
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "My App",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+## Configuration Sections
+
+The configuration is organized into several top-level sections:
+
+<CardGroup cols={2}>
+  <Card title="App" icon="circle-info" href="#app-configuration">
+    Application metadata like name, identifier, and version
+  </Card>
+  <Card title="Build" icon="hammer" href="/configuration/build-options">
+    Build options, bundler settings, and output configuration
+  </Card>
+  <Card title="Platform" icon="desktop" href="/configuration/platform-options">
+    Platform-specific options for macOS, Windows, and Linux
+  </Card>
+  <Card title="Runtime" icon="play" href="/configuration/runtime-options">
+    Runtime behavior and custom configuration values
+  </Card>
+  <Card title="Scripts" icon="terminal" href="#scripts-configuration">
+    Pre/post build and packaging hooks
+  </Card>
+  <Card title="Release" icon="rocket" href="#release-configuration">
+    Distribution and auto-update settings
+  </Card>
+</CardGroup>
+
+## App Configuration
+
+The `app` section defines core application metadata:
+
+<ParamField path="app.name" type="string" required>
+  The display name of your application. This appears in the title bar, dock/taskbar, and system dialogs.
+  
+  ```typescript
+  app: {
+    name: "Electrobun Kitchen Sink",
+  }
+  ```
+</ParamField>
+
+<ParamField path="app.identifier" type="string" required>
+  Unique identifier for your application (e.g., "com.example.myapp"). Used for platform-specific identifiers like bundle IDs on macOS and application IDs on Linux.
+  
+  ```typescript
+  app: {
+    identifier: "sh.blackboard.electrobun-kitchen",
+  }
+  ```
+</ParamField>
+
+<ParamField path="app.version" type="string" required>
+  Application version string in semantic versioning format (e.g., "1.0.0").
+  
+  ```typescript
+  app: {
+    version: "1.13.1",
+  }
+  ```
+</ParamField>
+
+<ParamField path="app.description" type="string">
+  Optional description of the application.
+</ParamField>
+
+<ParamField path="app.urlSchemes" type="string[]">
+  Custom URL schemes to register for deep linking (e.g., `["myapp", "myapp-dev"]`). This allows your app to be opened via URLs like `myapp://some/path`.
+  
+  **Platform support:**
+  - macOS: Fully supported. App must be in `/Applications` folder for registration to work.
+  - Windows: Not yet supported
+  - Linux: Not yet supported
+  
+  To handle incoming URLs, listen for the `open-url` event:
+  
+  ```typescript
+  Electrobun.events.on("open-url", (e) => {
+    console.log("Opened with URL:", e.data.url);
+  });
+  ```
+  
+  Example:
+  ```typescript
+  app: {
+    urlSchemes: ["electrobun-playground"],
+  }
+  ```
+</ParamField>
+
+## Scripts Configuration
+
+The `scripts` section allows you to run custom scripts at different stages of the build and packaging process:
+
+<ParamField path="scripts.preBuild" type="string">
+  Path to a script file to run before the build starts.
+  
+  ```typescript
+  scripts: {
+    preBuild: "./scripts/setup.ts",
+  }
+  ```
+</ParamField>
+
+<ParamField path="scripts.postBuild" type="string">
+  Path to a script file to run after the build completes.
+  
+  ```typescript
+  scripts: {
+    postBuild: "./buildScript.ts",
+  }
+  ```
+</ParamField>
+
+<ParamField path="scripts.postWrap" type="string">
+  Path to a script file to run after the app is wrapped (macOS .app bundle created).
+</ParamField>
+
+<ParamField path="scripts.postPackage" type="string">
+  Path to a script file to run after packaging is complete.
+</ParamField>
+
+## Release Configuration
+
+The `release` section configures distribution and auto-update settings:
+
+<ParamField path="release.baseUrl" type="string">
+  Base URL for artifact distribution (e.g., S3 bucket, GitHub Releases). Used for auto-updates and patch generation.
+  
+  ```typescript
+  release: {
+    baseUrl: "https://electrobun-kitchen.blackboard.sh/",
+  }
+  ```
+</ParamField>
+
+<ParamField path="release.generatePatch" type="boolean" default="true">
+  Generate delta patch files by diffing against the previous release. Disable to skip patch generation for local canary/stable testing.
+  
+  ```typescript
+  release: {
+    generatePatch: true,
+  }
+  ```
+</ParamField>
+
+## Type Safety
+
+Use the `satisfies ElectrobunConfig` directive to get full TypeScript type checking and autocomplete:
+
+```typescript
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  // Your config here
+} satisfies ElectrobunConfig;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build Options" icon="hammer" href="/configuration/build-options">
+    Configure bundler, views, and build outputs
+  </Card>
+  <Card title="Platform Options" icon="desktop" href="/configuration/platform-options">
+    Platform-specific settings for macOS, Windows, and Linux
+  </Card>
+  <Card title="Runtime Options" icon="play" href="/configuration/runtime-options">
+    Configure runtime behavior
+  </Card>
+</CardGroup>

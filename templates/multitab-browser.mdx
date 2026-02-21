@@ -1,0 +1,342 @@
+---
+title: Multitab Browser
+description: Browser-like app with tabs and navigation controls
+icon: window
+---
+
+The Multitab Browser template demonstrates how to build a browser-like application with multiple tabs, navigation controls, and iframe-based content rendering. It showcases RPC communication and complex UI state management.
+
+## Features
+
+- Tab management (create, close, switch)
+- Navigation controls (back, forward, reload)
+- URL bar with search support
+- RPC communication between processes
+- Tab state synchronization
+- Bookmark management
+
+## Initialize the Template
+
+Clone the template from the repository:
+
+```bash
+git clone https://github.com/blackboardsh/electrobun.git
+cp -r electrobun/templates/multitab-browser my-app
+cd my-app
+bun install
+```
+
+Run the app:
+
+```bash
+bun run dev
+```
+
+## Project Structure
+
+```
+multitab-browser/
+├── src/
+│   ├── bun/
+│   │   ├── index.ts          # Main process with RPC
+│   │   ├── tabManager.ts     # Tab management logic
+│   │   └── types/
+│   │       └── rpc.ts        # RPC type definitions
+│   └── mainview/
+│       ├── index.html        # Browser UI
+│       ├── index.ts          # UI logic and RPC client
+│       └── index.css         # Styles
+├── electrobun.config.ts
+└── package.json
+```
+
+## Key Code
+
+### RPC Schema
+
+Define the communication interface between processes:
+
+```typescript src/bun/types/rpc.ts
+export interface Tab {
+  id: string;
+  title: string;
+  url: string;
+  canGoBack: boolean;
+  canGoForward: boolean;
+  isLoading: boolean;
+}
+
+export interface Bookmark {
+  id: string;
+  title: string;
+  url: string;
+  createdAt: number;
+}
+```
+
+### RPC Server Setup
+
+The Bun process handles tab operations:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, BrowserView } from "electrobun/bun";
+
+const tabs = new Map();
+let mainRPC: any = null;
+
+const rpc = BrowserView.defineRPC({
+  maxRequestTime: 10000,
+  handlers: {
+    requests: {
+      createTab: async ({ url }: { url?: string }) => {
+        const id = `tab-${nextTabId++}`;
+        const tab = {
+          id,
+          title: "New Tab",
+          url: url || "https://electrobun.dev",
+          canGoBack: false,
+          canGoForward: false,
+          isLoading: false,
+        };
+        tabs.set(id, tab);
+        return tab;
+      },
+
+      navigateTo: async ({ tabId, url }) => {
+        const tab = tabs.get(tabId);
+        if (tab) {
+          // Process URL - add https if needed
+          let processedUrl = url;
+          if (!url.startsWith("http")) {
+            if (url.includes(".") && !url.includes(" ")) {
+              processedUrl = `https://${url}`;
+            } else {
+              // Treat as search query
+              processedUrl = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
+            }
+          }
+          tab.url = processedUrl;
+        }
+        return tab;
+      },
+
+      closeTab: async ({ id }) => {
+        tabs.delete(id);
+      },
+    },
+    messages: {},
+  },
+});
+
+const mainWindow = new BrowserWindow({
+  title: "Multitab Browser",
+  url: "views://mainview/index.html",
+  frame: { width: 1400, height: 900 },
+  rpc,
+});
+
+mainRPC = mainWindow.webview.rpc;
+```
+
+### RPC Client Usage
+
+The view calls RPC methods:
+
+```typescript src/mainview/index.ts
+import Electrobun, { Electroview } from "electrobun/view";
+
+const rpc = Electroview.defineRPC({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {},
+    messages: {
+      tabUpdated: (tab) => {
+        // Update UI when tab state changes
+        updateTabUI(tab);
+      },
+    },
+  },
+});
+
+const electrobun = new Electrobun.Electroview({ rpc });
+
+// Create a new tab
+async function createTab(url?: string) {
+  const tab = await electrobun.rpc!.request.createTab({ url });
+  addTabToUI(tab);
+}
+
+// Navigate to a URL
+async function navigate(url: string) {
+  const tab = await electrobun.rpc!.request.navigateTo({
+    tabId: currentTabId,
+    url,
+  });
+  updateTabUI(tab);
+}
+```
+
+### Tab Manager
+
+The `TabManager` class handles tab lifecycle:
+
+```typescript src/bun/tabManager.ts
+export class TabManager {
+  private tabs: Map<string, Tab> = new Map();
+  private webviews: Map<string, BrowserView> = new Map();
+
+  async createTab(url: string): Promise<Tab> {
+    const id = `tab-${this.nextTabId++}`;
+    
+    const webview = new BrowserView({
+      url,
+      frame: { x: 0, y: 100, width: 1400, height: 800 },
+    });
+
+    webview.on("did-navigate", (event) => {
+      const tab = this.tabs.get(id);
+      if (tab && event.data.url) {
+        tab.url = event.data.url;
+        this.onTabUpdate?.(tab);
+      }
+    });
+
+    const tab: Tab = {
+      id,
+      title: "New Tab",
+      url,
+      canGoBack: false,
+      canGoForward: false,
+      isLoading: true,
+    };
+
+    this.tabs.set(id, tab);
+    this.webviews.set(id, webview);
+    return tab;
+  }
+
+  async navigateTo(tabId: string, url: string): Promise<void> {
+    const webview = this.webviews.get(tabId);
+    if (webview) {
+      await webview.loadURL(url);
+    }
+  }
+}
+```
+
+## Features Demonstrated
+
+<CardGroup cols={2}>
+  <Card title="RPC Communication" icon="arrows-left-right">
+    Bidirectional communication between Bun and view processes
+  </Card>
+  
+  <Card title="State Management" icon="database">
+    Managing complex tab state across processes
+  </Card>
+  
+  <Card title="Dynamic UI" icon="wand-magic-sparkles">
+    Creating and destroying UI elements dynamically
+  </Card>
+  
+  <Card title="Event Handling" icon="bolt">
+    Responding to navigation and tab lifecycle events
+  </Card>
+</CardGroup>
+
+## URL Processing
+
+The browser intelligently processes URL bar input:
+
+```typescript
+function processUrl(input: string): string {
+  // Already has protocol
+  if (input.startsWith("http://") || input.startsWith("https://")) {
+    return input;
+  }
+  
+  // Looks like a domain
+  if (input.includes(".") && !input.includes(" ")) {
+    return `https://${input}`;
+  }
+  
+  // Treat as search query
+  return `https://www.google.com/search?q=${encodeURIComponent(input)}`;
+}
+```
+
+## Tab State
+
+Each tab maintains its state:
+
+```typescript
+interface Tab {
+  id: string;           // Unique identifier
+  title: string;        // Page title
+  url: string;          // Current URL
+  canGoBack: boolean;   // History state
+  canGoForward: boolean;// History state
+  isLoading: boolean;   // Loading state
+}
+```
+
+## Available Scripts
+
+<CodeGroup>
+```bash Development
+bun run dev
+```
+
+```bash Build
+bun run build
+```
+
+```bash Start
+bun run start
+```
+</CodeGroup>
+
+## Key Concepts
+
+<AccordionGroup>
+  <Accordion title="Tab Management">
+    Tabs are created and managed in the Bun process. Each tab can have its own BrowserView for isolated content rendering.
+  </Accordion>
+  
+  <Accordion title="RPC Requests vs Messages">
+    - **Requests**: Async operations that return a response (e.g., `createTab`)
+    - **Messages**: One-way notifications (e.g., `tabUpdated`)
+  </Accordion>
+  
+  <Accordion title="URL Bar Logic">
+    The URL bar accepts:
+    - Full URLs with protocol: `https://example.com`
+    - Domains without protocol: `example.com` → `https://example.com`
+    - Search queries: `hello world` → Google search
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<Steps>
+  <Step title="Explore the UI">
+    Open the app and create multiple tabs to see state management in action
+  </Step>
+  
+  <Step title="Study RPC patterns">
+    Review how RPC enables communication between processes
+  </Step>
+  
+  <Step title="Add features">
+    Try adding bookmarks, history, or custom tab icons
+  </Step>
+  
+  <Step title="Learn BrowserView">
+    Read about [BrowserView](/api/browser-view) for advanced use cases
+  </Step>
+</Steps>
+
+## Source Code
+
+View the complete template source on GitHub:
+[templates/multitab-browser](https://github.com/blackboardsh/electrobun/tree/main/templates/multitab-browser)

@@ -1,0 +1,270 @@
+---
+title: Electroview
+description: API reference for the Electroview class used in webview processes
+---
+
+The `Electroview` class is the main interface for webview processes in Electrobun applications. It handles bidirectional RPC communication between webview and Bun processes, with built-in encryption for secure message passing.
+
+## Importing
+
+```typescript
+import { Electroview } from "electrobun/view";
+```
+
+## Constructor
+
+### `new Electroview(config)`
+
+Creates a new Electroview instance with the specified RPC configuration.
+
+<ParamField path="config" type="object" required>
+  Configuration object for the Electroview instance
+  
+  <ParamField path="config.rpc" type="RPCWithTransport" required>
+    RPC configuration created using `Electroview.defineRPC()`
+  </ParamField>
+</ParamField>
+
+```typescript
+const rpc = Electroview.defineRPC({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {
+      getUserData: async () => {
+        return { id: 1, name: "John" };
+      }
+    },
+    messages: {
+      logEvent: ({ event }) => {
+        console.log("Event:", event);
+      }
+    }
+  }
+});
+
+const electroview = new Electroview({ rpc });
+```
+
+## Static Methods
+
+### `Electroview.defineRPC(config)`
+
+Defines an RPC schema for bidirectional communication between webview and Bun processes. This method must be called before creating an Electroview instance.
+
+<ParamField path="config" type="ElectrobunRPCConfig" required>
+  RPC configuration object
+  
+  <ParamField path="config.maxRequestTime" type="number">
+    Maximum time in milliseconds to wait for RPC request responses. Default: 1000ms
+  </ParamField>
+  
+  <ParamField path="config.handlers" type="object" required>
+    Request and message handlers
+    
+    <ParamField path="config.handlers.requests" type="object">
+      Object mapping request names to handler functions. Handlers can be async and must return a value.
+      
+      ```typescript
+      requests: {
+        getUserProfile: async ({ userId }) => {
+          const user = await fetchUser(userId);
+          return user;
+        }
+      }
+      ```
+    </ParamField>
+    
+    <ParamField path="config.handlers.messages" type="object">
+      Object mapping message names to handler functions. Messages are fire-and-forget (no response expected).
+      
+      ```typescript
+      messages: {
+        trackAnalytics: ({ event, data }) => {
+          analytics.track(event, data);
+        }
+      }
+      ```
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ResponseField name="return" type="RPCWithTransport">
+  RPC configuration object to pass to the Electroview constructor
+</ResponseField>
+
+```typescript
+const rpc = Electroview.defineRPC<MyRPCSchema>({
+  maxRequestTime: 10000,
+  handlers: {
+    requests: {
+      // Handle requests from Bun process
+      getTheme: async () => {
+        return localStorage.getItem("theme") || "light";
+      },
+      performAction: async ({ action, params }) => {
+        return await doSomething(action, params);
+      }
+    },
+    messages: {
+      // Handle messages from Bun process
+      updateUI: ({ data }) => {
+        updateInterface(data);
+      },
+      showNotification: ({ title, message }) => {
+        new Notification(title, { body: message });
+      }
+    }
+  }
+});
+```
+
+## Instance Properties
+
+### `electroview.rpc`
+
+The RPC instance used for communication with the Bun process. Provides `request` and `message` methods for making calls.
+
+<ResponseField name="rpc.request" type="object">
+  Object containing request methods defined in the Bun process's RPC handlers. Each method returns a Promise.
+  
+  ```typescript
+  // Call a request handler in the Bun process
+  const result = await electroview.rpc.request.fetchData({ id: 123 });
+  ```
+</ResponseField>
+
+<ResponseField name="rpc.message" type="object">
+  Object containing message methods defined in the Bun process's RPC handlers. Messages don't return values.
+  
+  ```typescript
+  // Send a message to the Bun process
+  electroview.rpc.message.logActivity({ action: "click", target: "button" });
+  ```
+</ResponseField>
+
+## Communication Examples
+
+### Basic RPC Setup
+
+```typescript
+import { Electroview } from "electrobun/view";
+
+// Define RPC schema with handlers
+const rpc = Electroview.defineRPC({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {
+      // Bun can call these from the webview
+      multiply: ({ a, b }) => a * b,
+      getDocumentTitle: () => document.title
+    },
+    messages: {
+      // Bun can send these messages
+      ping: ({ timestamp }) => {
+        console.log("Pinged at", timestamp);
+      }
+    }
+  }
+});
+
+const electroview = new Electroview({ rpc });
+```
+
+### Making Requests to Bun Process
+
+```typescript
+// Request with response
+const userData = await electroview.rpc.request.getUserData({ userId: "123" });
+console.log("User:", userData);
+
+// Handle errors
+try {
+  const result = await electroview.rpc.request.riskyOperation({});
+  console.log("Success:", result);
+} catch (error) {
+  console.error("RPC request failed:", error);
+}
+```
+
+### Sending Messages to Bun Process
+
+```typescript
+// Fire-and-forget messages (no response)
+electroview.rpc.message.logEvent({
+  type: "page_view",
+  page: window.location.pathname,
+  timestamp: Date.now()
+});
+
+electroview.rpc.message.updateStatus({ status: "ready" });
+```
+
+### TypeScript Type Safety
+
+```typescript
+type MyRPCSchema = {
+  requests: {
+    fetchUser: { params: { id: number }, response: { name: string, email: string } },
+    saveSettings: { params: { theme: string }, response: { success: boolean } }
+  },
+  messages: {
+    logActivity: { action: string, data: any },
+    clearCache: void
+  }
+};
+
+const rpc = Electroview.defineRPC<MyRPCSchema>({
+  handlers: {
+    requests: {
+      fetchUser: async ({ id }) => {
+        // id is typed as number
+        return { name: "John", email: "john@example.com" };
+      }
+    },
+    messages: {
+      logActivity: ({ action, data }) => {
+        // action is typed as string
+        console.log(action, data);
+      }
+    }
+  }
+});
+
+const electroview = new Electroview({ rpc });
+
+// Type-safe calls to Bun process
+const user = await electroview.rpc.request.fetchUser({ id: 1 });
+// user is typed as { name: string, email: string }
+```
+
+## Built-in Request Handler
+
+### `evaluateJavascriptWithResponse`
+
+Every Electroview instance automatically includes an `evaluateJavascriptWithResponse` handler that allows the Bun process to execute JavaScript in the webview.
+
+```typescript
+// From the Bun process:
+const result = await window.webview.rpc.request.evaluateJavascriptWithResponse({
+  script: `return document.title`
+});
+
+// Async scripts are supported:
+const asyncResult = await window.webview.rpc.request.evaluateJavascriptWithResponse({
+  script: `
+    return new Promise(resolve => {
+      setTimeout(() => resolve('done'), 1000);
+    });
+  `
+});
+```
+
+## Security
+
+Electroview uses AES-GCM encryption for all RPC messages transmitted over WebSocket connections. Each webview has a unique encryption key that's established during initialization, ensuring that messages cannot be intercepted or tampered with.
+
+## Related
+
+- [Webview Tag](/api/webview-tag) - HTML custom element for embedding webviews
+- [BrowserWindow](/api/browser-window) - Creating and managing windows
+- [RPC Communication](/guides/inter-process-communication) - Complete guide to RPC patterns

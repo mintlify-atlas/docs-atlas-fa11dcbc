@@ -1,0 +1,198 @@
+---
+title: 'GlobalShortcut'
+description: 'Register and manage system-wide keyboard shortcuts'
+icon: 'keyboard'
+---
+
+The `GlobalShortcut` module allows you to register system-wide keyboard shortcuts that work even when your application doesn't have focus.
+
+## register
+
+Register a global keyboard shortcut.
+
+```typescript
+import { GlobalShortcut } from 'electrobun/bun';
+
+const success = GlobalShortcut.register(accelerator, callback);
+```
+
+<ParamField path="accelerator" type="string" required>
+  The keyboard shortcut string (e.g., 'CommandOrControl+Shift+Space')
+</ParamField>
+
+<ParamField path="callback" type="() => void" required>
+  Function to call when the shortcut is triggered
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if registered successfully, `false` if already registered or invalid
+</ResponseField>
+
+## unregister
+
+Unregister a global keyboard shortcut.
+
+```typescript
+const success = GlobalShortcut.unregister(accelerator);
+```
+
+<ParamField path="accelerator" type="string" required>
+  The keyboard shortcut to unregister
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if unregistered successfully
+</ResponseField>
+
+## unregisterAll
+
+Unregister all global keyboard shortcuts.
+
+```typescript
+GlobalShortcut.unregisterAll();
+```
+
+## isRegistered
+
+Check if a shortcut is registered.
+
+```typescript
+const registered = GlobalShortcut.isRegistered(accelerator);
+```
+
+<ParamField path="accelerator" type="string" required>
+  The keyboard shortcut to check
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if the shortcut is registered
+</ResponseField>
+
+## Example
+
+```typescript
+import { GlobalShortcut, BrowserWindow } from 'electrobun/bun';
+
+// Register a shortcut to show the window
+GlobalShortcut.register('CommandOrControl+Shift+Space', () => {
+  mainWindow.show();
+  mainWindow.focus();
+});
+
+// Register a shortcut to toggle dev tools
+GlobalShortcut.register('CommandOrControl+Shift+I', () => {
+  mainWindow.webview.toggleDevTools();
+});
+
+// Check if registered
+if (GlobalShortcut.isRegistered('CommandOrControl+Shift+Space')) {
+  console.log('Global shortcut is active');
+}
+
+// Cleanup on quit
+Electrobun.events.app.on('beforeQuit', () => {
+  GlobalShortcut.unregisterAll();
+});
+```
+
+## Accelerator Syntax
+
+Shortcuts use the following syntax:
+
+### Modifiers
+
+- `CommandOrControl` (or `CmdOrCtrl`) - Cmd on macOS, Ctrl on Windows/Linux
+- `Command` (or `Cmd`) - macOS only
+- `Control` (or `Ctrl`) - Ctrl key
+- `Alt` (or `Option`) - Alt key (Option on macOS)
+- `Shift` - Shift key
+- `Super` - Windows key on Windows/Linux, Cmd on macOS
+
+### Keys
+
+- Letter keys: `A`, `B`, `C`, etc.
+- Number keys: `0`, `1`, `2`, etc.
+- Function keys: `F1`, `F2`, etc.
+- Special keys: `Space`, `Tab`, `Enter`, `Escape`, `Backspace`, `Delete`
+- Arrow keys: `Up`, `Down`, `Left`, `Right`
+- Media keys: `VolumeUp`, `VolumeDown`, `VolumeMute`, `MediaPlayPause`, `MediaStop`, `MediaNextTrack`, `MediaPreviousTrack`
+
+### Examples
+
+```typescript
+// Cross-platform shortcuts
+'CommandOrControl+Q'        // Cmd+Q on macOS, Ctrl+Q on Windows/Linux
+'CommandOrControl+Shift+N'  // New window shortcut
+'Alt+F4'                    // Close window (Windows standard)
+
+// macOS-specific
+'Command+,'
+'Command+Option+Escape'
+
+// Media keys
+'MediaPlayPause'
+'VolumeUp'
+'MediaNextTrack'
+
+// Function keys
+'F5'              // Refresh
+'Shift+F5'        // Hard refresh
+'CommandOrControl+Shift+I'  // Dev tools
+```
+
+## Best Practices
+
+### Use Cross-Platform Shortcuts
+
+Always use `CommandOrControl` instead of platform-specific modifiers:
+
+```typescript
+// Good: Works everywhere
+GlobalShortcut.register('CommandOrControl+Shift+Space', callback);
+
+// Bad: Only works on macOS
+GlobalShortcut.register('Command+Shift+Space', callback);
+```
+
+### Check Registration Success
+
+Some shortcuts may already be taken by the system or other apps:
+
+```typescript
+const success = GlobalShortcut.register('CommandOrControl+Space', callback);
+
+if (!success) {
+  console.warn('Failed to register shortcut - may already be in use');
+}
+```
+
+### Clean Up on Exit
+
+Always unregister shortcuts when your app quits:
+
+```typescript
+Electrobun.events.app.on('beforeQuit', () => {
+  GlobalShortcut.unregisterAll();
+});
+```
+
+### Avoid Common System Shortcuts
+
+Don't override common system shortcuts:
+
+- ❌ `Command+Q` (Quit on macOS)
+- ❌ `Alt+F4` (Close on Windows)
+- ❌ `Command+Tab` (App switcher)
+- ❌ `Command+Space` (Spotlight on macOS)
+
+## Notes
+
+- Global shortcuts work even when your app is in the background
+- Some shortcuts may be reserved by the operating system
+- If registration fails, the shortcut is likely already in use
+- Global shortcuts are automatically unregistered when the app quits
+
+## Related
+
+- [Application Menu](/api/application-menu) - Menu keyboard shortcuts
+- [BrowserWindow](/api/browser-window) - Window management

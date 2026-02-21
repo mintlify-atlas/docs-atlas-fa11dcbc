@@ -1,0 +1,187 @@
+---
+title: 'Application Menu'
+description: 'Create native application menus'
+icon: 'bars'
+---
+
+The `ApplicationMenu` module provides functions to create and manage native application menus (the menu bar on macOS, the window menu bar on Windows/Linux).
+
+## setApplicationMenu
+
+Set the application menu.
+
+```typescript
+import { ApplicationMenu } from 'electrobun/bun';
+
+ApplicationMenu.setApplicationMenu(menu);
+```
+
+<ParamField path="menu" type="Array<ApplicationMenuItemConfig>" required>
+  Array of menu item configurations
+  
+  <Expandable title="ApplicationMenuItemConfig">
+    <ParamField path="type" type="'normal' | 'divider' | 'separator'" default="'normal'">
+      Menu item type
+    </ParamField>
+    
+    <ParamField path="label" type="string" optional>
+      Menu item label (required for normal items unless using role)
+    </ParamField>
+    
+    <ParamField path="action" type="string" optional>
+      Action identifier to emit when clicked (cannot be used with role)
+    </ParamField>
+    
+    <ParamField path="role" type="string" optional>
+      Built-in menu role (e.g., 'quit', 'copy', 'paste'). Cannot be used with action.
+    </ParamField>
+    
+    <ParamField path="data" type="any" optional>
+      Custom data to pass with the action
+    </ParamField>
+    
+    <ParamField path="enabled" type="boolean" default="true">
+      Whether the item is enabled
+    </ParamField>
+    
+    <ParamField path="checked" type="boolean" default="false">
+      Whether the item is checked (for checkbox items)
+    </ParamField>
+    
+    <ParamField path="hidden" type="boolean" default="false">
+      Whether the item is hidden
+    </ParamField>
+    
+    <ParamField path="tooltip" type="string" optional>
+      Tooltip text
+    </ParamField>
+    
+    <ParamField path="accelerator" type="string" optional>
+      Keyboard shortcut (e.g., 'CommandOrControl+Q')
+    </ParamField>
+    
+    <ParamField path="submenu" type="Array<ApplicationMenuItemConfig>" optional>
+      Nested submenu items
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## on
+
+Listen to application menu events.
+
+```typescript
+ApplicationMenu.on(eventName, handler);
+```
+
+<ParamField path="eventName" type="'application-menu-clicked'" required>
+  Event name
+</ParamField>
+
+<ParamField path="handler" type="(event: unknown) => void" required>
+  Event handler function
+</ParamField>
+
+## Example
+
+```typescript
+import { ApplicationMenu, Utils } from 'electrobun/bun';
+
+ApplicationMenu.setApplicationMenu([
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'New Window',
+        action: 'new-window',
+        accelerator: 'CommandOrControl+N',
+      },
+      {
+        type: 'divider',
+      },
+      {
+        label: 'Quit',
+        role: 'quit',
+        accelerator: 'CommandOrControl+Q',
+      },
+    ],
+  },
+  {
+    label: 'Edit',
+    submenu: [
+      {
+        label: 'Cut',
+        role: 'cut',
+        accelerator: 'CommandOrControl+X',
+      },
+      {
+        label: 'Copy',
+        role: 'copy',
+        accelerator: 'CommandOrControl+C',
+      },
+      {
+        label: 'Paste',
+        role: 'paste',
+        accelerator: 'CommandOrControl+V',
+      },
+    ],
+  },
+]);
+
+ApplicationMenu.on('application-menu-clicked', (event) => {
+  if (event.action === 'new-window') {
+    new BrowserWindow({ title: 'New Window' });
+  }
+});
+```
+
+## Built-in Menu Roles
+
+Menu items can use built-in roles that provide standard functionality:
+
+- `quit` - Quit the application
+- `copy` - Copy selected text
+- `paste` - Paste from clipboard
+- `cut` - Cut selected text
+- `selectAll` - Select all content
+- `undo` - Undo last action
+- `redo` - Redo last undone action
+- `minimize` - Minimize window
+- `close` - Close window
+- `zoom` - Zoom window
+- `toggleFullScreen` - Toggle fullscreen mode
+
+Roles automatically provide the appropriate label and default keyboard shortcut for the platform.
+
+## Keyboard Shortcuts
+
+Use the `accelerator` property to define keyboard shortcuts:
+
+- `CommandOrControl+Key` - Cmd on macOS, Ctrl on Windows/Linux
+- `Alt+Key` - Alt key
+- `Shift+Key` - Shift key
+- `Command+Key` - macOS only
+- `Control+Key` - Ctrl key
+
+Examples:
+- `CommandOrControl+Q` - Quit
+- `CommandOrControl+Shift+N` - New incognito window
+- `Alt+F4` - Close window (Windows)
+
+## Events
+
+### application-menu-clicked
+
+Emitted when a menu item with an action is clicked.
+
+```typescript
+ApplicationMenu.on('application-menu-clicked', (event) => {
+  console.log('Action:', event.action);
+  console.log('Data:', event.data);
+});
+```
+
+## Related
+
+- [Context Menu](/api/context-menu) - Show context menus
+- [Tray](/api/tray) - Create system tray icons

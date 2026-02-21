@@ -1,0 +1,221 @@
+---
+title: Menu Types
+description: Type definitions for application and context menus
+---
+
+## ApplicationMenuItemConfig
+
+Configuration for menu items in application menus and context menus.
+
+### Divider Menu Item
+
+A separator between menu items.
+
+<ParamField path="type" type="'divider' | 'separator'" required>
+  Specifies this is a divider/separator item
+</ParamField>
+
+### Action Menu Item
+
+A standard menu item with a custom action.
+
+<ParamField path="type" type="'normal'" default="'normal'">
+  Menu item type
+</ParamField>
+
+<ParamField path="label" type="string" required>
+  Text to display for the menu item
+</ParamField>
+
+<ParamField path="tooltip" type="string" default="undefined">
+  Tooltip text shown on hover
+</ParamField>
+
+<ParamField path="action" type="string" default="undefined">
+  Action identifier triggered when item is clicked. Cannot be used with `role`.
+</ParamField>
+
+<ParamField path="data" type="any" default="undefined">
+  Additional data passed to the action handler
+</ParamField>
+
+<ParamField path="submenu" type="ApplicationMenuItemConfig[]" default="undefined">
+  Nested submenu items
+</ParamField>
+
+<ParamField path="enabled" type="boolean" default="true">
+  Whether the menu item can be clicked
+</ParamField>
+
+<ParamField path="checked" type="boolean" default="false">
+  Whether the menu item shows a checkmark
+</ParamField>
+
+<ParamField path="hidden" type="boolean" default="false">
+  Whether the menu item is visible
+</ParamField>
+
+<ParamField path="accelerator" type="string" default="undefined">
+  Keyboard shortcut for the menu item (e.g., `"CommandOrControl+Q"`)
+</ParamField>
+
+### Role Menu Item
+
+A menu item with predefined system behavior.
+
+<ParamField path="type" type="'normal'" default="'normal'">
+  Menu item type
+</ParamField>
+
+<ParamField path="label" type="string" default="auto-generated">
+  Text to display (auto-generated from role if not provided)
+</ParamField>
+
+<ParamField path="tooltip" type="string" default="undefined">
+  Tooltip text shown on hover
+</ParamField>
+
+<ParamField path="role" type="string" required>
+  Predefined system role (e.g., `"quit"`, `"copy"`, `"paste"`). Cannot be used with `action`.
+</ParamField>
+
+<ParamField path="data" type="any" default="undefined">
+  Additional data for the role handler
+</ParamField>
+
+<ParamField path="submenu" type="ApplicationMenuItemConfig[]" default="undefined">
+  Nested submenu items
+</ParamField>
+
+<ParamField path="enabled" type="boolean" default="true">
+  Whether the menu item can be clicked
+</ParamField>
+
+<ParamField path="checked" type="boolean" default="false">
+  Whether the menu item shows a checkmark
+</ParamField>
+
+<ParamField path="hidden" type="boolean" default="false">
+  Whether the menu item is visible
+</ParamField>
+
+<ParamField path="accelerator" type="string" default="undefined">
+  Keyboard shortcut for the menu item
+</ParamField>
+
+## Usage Examples
+
+### Application Menu
+
+```typescript
+import { setApplicationMenu } from '@electrobun/core';
+
+setApplicationMenu([
+  {
+    label: 'File',
+    submenu: [
+      {
+        label: 'New Window',
+        action: 'new-window',
+        accelerator: 'CommandOrControl+N'
+      },
+      { type: 'divider' },
+      {
+        label: 'Quit',
+        role: 'quit',
+        accelerator: 'CommandOrControl+Q'
+      }
+    ]
+  },
+  {
+    label: 'Edit',
+    submenu: [
+      { label: 'Cut', role: 'cut' },
+      { label: 'Copy', role: 'copy' },
+      { label: 'Paste', role: 'paste' }
+    ]
+  }
+]);
+```
+
+### Context Menu
+
+```typescript
+import { showContextMenu } from '@electrobun/core';
+
+showContextMenu([
+  {
+    label: 'Refresh',
+    action: 'refresh',
+    data: { windowId: 1 }
+  },
+  { type: 'separator' },
+  {
+    label: 'Inspect Element',
+    action: 'inspect'
+  }
+]);
+```
+
+### Menu with Checkboxes
+
+```typescript
+const menuItems: ApplicationMenuItemConfig[] = [
+  {
+    label: 'View',
+    submenu: [
+      {
+        label: 'Dark Mode',
+        action: 'toggle-dark-mode',
+        checked: true,
+        enabled: true
+      },
+      {
+        label: 'Show Sidebar',
+        action: 'toggle-sidebar',
+        checked: false
+      }
+    ]
+  }
+];
+```
+
+### Conditional Menu Items
+
+```typescript
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+const menuItems: ApplicationMenuItemConfig[] = [
+  {
+    label: 'Developer',
+    hidden: !isDevelopment,
+    submenu: [
+      {
+        label: 'Reload',
+        action: 'reload',
+        accelerator: 'CommandOrControl+R'
+      },
+      {
+        label: 'Toggle DevTools',
+        action: 'toggle-devtools',
+        accelerator: 'CommandOrControl+Shift+I'
+      }
+    ]
+  }
+];
+```
+
+## Common Menu Roles
+
+- `quit` - Quit the application
+- `copy` - Copy selected text
+- `cut` - Cut selected text
+- `paste` - Paste from clipboard
+- `selectAll` - Select all content
+- `undo` - Undo last action
+- `redo` - Redo last undone action
+
+## See Also
+
+- [Application Menu](/api/application-menu)
+- [Context Menu](/api/context-menu)

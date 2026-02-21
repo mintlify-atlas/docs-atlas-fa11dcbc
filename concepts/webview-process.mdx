@@ -1,0 +1,514 @@
+---
+title: Webview Process
+description: Learn how to create webviews and build user interfaces in Electrobun applications
+---
+
+# Webview Process
+
+The **webview process** (also called the renderer process) is where your application's user interface lives. Each webview runs in a sandboxed environment and displays HTML, CSS, and JavaScript content.
+
+## What is a Webview?
+
+A webview is a component that:
+
+- Renders HTML/CSS/JavaScript like a web browser
+- Runs in an isolated, sandboxed environment
+- Uses the system's native webview engine by default
+- Communicates with the main process via RPC
+- Can be embedded in windows or created as standalone views
+
+<Info>
+Electrobun uses **system webviews** by default (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux) or optionally **CEF** (Chromium Embedded Framework) for consistent cross-platform rendering.
+</Info>
+
+## Creating Webviews
+
+### Via BrowserWindow
+
+The most common way to create a webview is through a `BrowserWindow`, which automatically creates and attaches a webview:
+
+```typescript title="src/bun/index.ts"
+import { BrowserWindow } from "electrobun/bun";
+
+const mainWindow = new BrowserWindow({
+  title: "My App",
+  url: "views://mainview/index.html",
+  frame: { width: 1024, height: 768, x: 100, y: 100 },
+  renderer: "native", // or "cef"
+});
+
+// Access the webview
+const webview = mainWindow.webview;
+```
+
+### Standalone BrowserView
+
+You can also create standalone webviews:
+
+```typescript
+import { BrowserView } from "electrobun/bun";
+
+const view = new BrowserView({
+  url: "https://example.com",
+  frame: { x: 0, y: 0, width: 800, height: 600 },
+  renderer: "native",
+});
+```
+
+## Webview Options
+
+### Basic Configuration
+
+```typescript
+const view = new BrowserView({
+  // Content source (choose one)
+  url: "views://mainview/index.html",  // Local or remote URL
+  html: "<h1>Hello World</h1>",         // Direct HTML string
+  
+  // Window dimensions
+  frame: {
+    x: 0,
+    y: 0,
+    width: 1024,
+    height: 768,
+  },
+  
+  // Renderer engine
+  renderer: "native",  // "native" or "cef"
+  
+  // Preload script (runs before page content)
+  preload: "path/to/preload.js",
+  
+  // Auto-resize with window
+  autoResize: true,
+});
+```
+
+### Security Options
+
+```typescript
+const secureView = new BrowserView({
+  url: "https://untrusted-site.com",
+  
+  // Enable sandbox mode (disables RPC)
+  sandbox: true,
+  
+  // Navigation rules (whitelist/blacklist)
+  navigationRules: JSON.stringify([
+    { type: "allow", pattern: "https://untrusted-site.com/*" },
+    { type: "deny", pattern: "*" },
+  ]),
+  
+  // Session partition (isolated cookies/storage)
+  partition: "persist:myPartition",
+});
+```
+
+<Warning>
+Always use `sandbox: true` and `navigationRules` when loading untrusted content (external websites, user-provided URLs) to prevent security vulnerabilities.
+</Warning>
+
+### Transparency Options
+
+```typescript
+const transparentView = new BrowserView({
+  url: "views://overlay/index.html",
+  startTransparent: true,   // Window background is transparent
+  startPassthrough: true,   // Mouse events pass through transparent areas
+});
+```
+
+## URL Schemes
+
+### views:// Protocol
+
+Electrobun provides a custom `views://` protocol for loading local HTML files:
+
+```typescript
+// Load from build output
+url: "views://mainview/index.html"
+
+// Corresponds to the view defined in electrobun.config.ts:
+{
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts"
+      }
+    },
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+      "src/mainview/index.css": "views/mainview/index.css"
+    }
+  }
+}
+```
+
+### Loading HTML Directly
+
+```typescript
+// Load HTML string
+view.loadHTML(`
+  <!DOCTYPE html>
+  <html>
+    <head><title>Dynamic Content</title></head>
+    <body><h1>Hello World</h1></body>
+  </html>
+`);
+
+// Load URL dynamically
+view.loadURL("https://example.com");
+```
+
+## Webview HTML Structure
+
+A typical webview HTML file:
+
+```html title="src/mainview/index.html"
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div id="app">
+    <h1>Hello Electrobun!</h1>
+    <button id="myButton">Click Me</button>
+  </div>
+  
+  <!-- Your bundled JavaScript -->
+  <script src="index.js"></script>
+</body>
+</html>
+```
+
+## Webview JavaScript
+
+### Basic Setup
+
+```typescript title="src/mainview/index.ts"
+import { Electroview } from "electrobun/browser";
+
+// Initialize Electroview
+const view = new Electroview({
+  rpc: rpcConfig, // RPC configuration (see RPC Communication)
+});
+
+// Your app logic
+document.getElementById("myButton")?.addEventListener("click", async () => {
+  console.log("Button clicked!");
+  
+  // Call main process via RPC
+  const result = await view.rpc.request.someMethod({ data: "hello" });
+  console.log("Result:", result);
+});
+```
+
+### Global Variables
+
+Electrobun injects global variables into the webview:
+
+```typescript
+// Webview ID (unique identifier)
+const webviewId = window.__electrobunWebviewId;
+
+// RPC socket port
+const rpcPort = window.__electrobunRpcSocketPort;
+
+// Internal bridge object
+const bridge = window.__electrobun;
+```
+
+<Note>
+These globals are injected by the preload script and are available before your code runs.
+</Note>
+
+## Navigation Events
+
+Monitor webview navigation:
+
+```typescript title="src/bun/index.ts"
+view.on("will-navigate", (event) => {
+  console.log("About to navigate to:", event.url);
+  // You can prevent navigation here if needed
+});
+
+view.on("did-navigate", (event) => {
+  console.log("Navigation completed:", event.url);
+});
+
+view.on("did-navigate-in-page", (event) => {
+  console.log("In-page navigation (anchor):", event.url);
+});
+
+view.on("dom-ready", (event) => {
+  console.log("DOM is ready");
+  // Good time to inject JavaScript
+});
+```
+
+## JavaScript Injection
+
+Execute JavaScript in the webview from the main process:
+
+```typescript
+// Execute JavaScript
+view.executeJavascript(`
+  document.body.style.backgroundColor = 'blue';
+  console.log('Background changed!');
+`);
+
+// Execute with result (requires RPC)
+const result = await view.rpc.request.evaluateJavascriptWithResponse({
+  script: `
+    const count = document.querySelectorAll('p').length;
+    return count;
+  `
+});
+console.log("Paragraph count:", result);
+```
+
+<Tip>
+Use `executeJavascript()` for fire-and-forget commands and RPC for getting return values.
+</Tip>
+
+## Developer Tools
+
+Open Chrome DevTools for debugging:
+
+```typescript
+// Toggle DevTools
+view.toggleDevTools();
+
+// Or explicitly open/close
+view.openDevTools();
+view.closeDevTools();
+```
+
+<CodeGroup>
+```typescript macOS
+// Open DevTools with keyboard shortcut
+view.on("dom-ready", () => {
+  // Cmd+Option+I to toggle DevTools
+  GlobalShortcut.register("Command+Option+I", () => {
+    view.toggleDevTools();
+  });
+});
+```
+
+```typescript Windows/Linux
+// Open DevTools with keyboard shortcut
+view.on("dom-ready", () => {
+  // Ctrl+Shift+I to toggle DevTools
+  GlobalShortcut.register("Control+Shift+I", () => {
+    view.toggleDevTools();
+  });
+});
+```
+</CodeGroup>
+
+## Find in Page
+
+Search for text in the webview:
+
+```typescript
+// Start search
+view.findInPage("search term", {
+  forward: true,      // Search direction
+  matchCase: false,   // Case-sensitive
+});
+
+// Stop search
+view.stopFindInPage();
+```
+
+## Using Web Frameworks
+
+Electrobun works with any web framework:
+
+### React
+
+```typescript title="src/mainview/index.tsx"
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { Electroview } from "electrobun/browser";
+import App from "./App";
+
+// Initialize RPC
+const view = new Electroview({ rpc });
+
+// Render React app
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App view={view} />
+  </React.StrictMode>
+);
+```
+
+### Svelte
+
+```typescript title="src/mainview/main.ts"
+import { mount } from "svelte";
+import App from "./App.svelte";
+import { Electroview } from "electrobun/browser";
+
+// Initialize RPC
+const view = new Electroview({ rpc });
+
+// Mount Svelte app
+const app = mount(App, {
+  target: document.getElementById("app")!,
+  props: { view },
+});
+
+export default app;
+```
+
+### Vue
+
+```typescript title="src/mainview/main.ts"
+import { createApp } from "vue";
+import App from "./App.vue";
+import { Electroview } from "electrobun/browser";
+
+// Initialize RPC
+const view = new Electroview({ rpc });
+
+// Create Vue app
+const app = createApp(App);
+app.provide("view", view);
+app.mount("#app");
+```
+
+## Preload Scripts
+
+Preload scripts run before the page content loads:
+
+```javascript title="preload.js"
+// This runs in the webview before page content
+console.log("Preload script running");
+
+// Expose safe APIs to the page
+window.myAPI = {
+  platform: process.platform,
+  sendMessage: (msg) => {
+    // Safe wrapper around RPC
+    console.log("Message:", msg);
+  },
+};
+```
+
+```typescript title="Main process"
+const view = new BrowserView({
+  url: "views://mainview/index.html",
+  preload: "path/to/preload.js",
+});
+```
+
+<Warning>
+Be careful what you expose in preload scripts - don't give the page unlimited access to Node.js APIs, especially for untrusted content.
+</Warning>
+
+## Session Partitions
+
+Isolate webview storage and cookies:
+
+```typescript
+// Persistent partition (saved to disk)
+const view1 = new BrowserView({
+  partition: "persist:user1",
+  url: "https://example.com",
+});
+
+// In-memory partition (cleared on app close)
+const view2 = new BrowserView({
+  partition: "temp:session1",
+  url: "https://example.com",
+});
+
+// Default partition (shared)
+const view3 = new BrowserView({
+  partition: null, // or omit
+  url: "https://example.com",
+});
+```
+
+## Best Practices
+
+### 1. Keep UI Logic in Webview
+
+```typescript
+// ✅ Good: UI logic in webview
+button.addEventListener("click", async () => {
+  button.disabled = true;
+  button.textContent = "Saving...";
+  
+  try {
+    await view.rpc.request.saveData({ ... });
+    button.textContent = "Saved!";
+  } catch (error) {
+    button.textContent = "Error!";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// ❌ Bad: Don't manage UI state from main process
+```
+
+### 2. Handle Loading States
+
+```typescript
+view.on("dom-ready", () => {
+  console.log("Page is ready");
+  // Safe to inject JavaScript now
+});
+
+view.on("did-navigate", (event) => {
+  console.log("Navigation complete:", event.url);
+  // Update window title, etc.
+});
+```
+
+### 3. Validate Navigation
+
+```typescript
+view.on("will-navigate", (event) => {
+  const url = new URL(event.url);
+  
+  // Block external navigation
+  if (url.protocol === "http:" || url.protocol === "https:") {
+    if (!url.hostname.endsWith("myapp.com")) {
+      console.log("Blocked navigation to:", event.url);
+      event.preventDefault();
+    }
+  }
+});
+```
+
+### 4. Clean Up Event Listeners
+
+```typescript
+const handler = (event) => {
+  console.log("Navigation:", event.url);
+};
+
+view.on("did-navigate", handler);
+
+// Later: remove listener
+view.off("did-navigate", handler);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="RPC Communication" icon="arrows-left-right" href="/concepts/rpc-communication">
+    Learn how to communicate between main and webview processes
+  </Card>
+  <Card title="Main Process" icon="server" href="/concepts/main-process">
+    Understand the Bun-powered main process
+  </Card>
+</CardGroup>

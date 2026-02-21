@@ -1,0 +1,373 @@
+---
+title: 'Utils'
+description: 'Utility functions for common operations'
+icon: 'wrench'
+---
+
+The `Utils` module provides utility functions for file operations, dialogs, notifications, clipboard access, and application control.
+
+## File Operations
+
+### moveToTrash
+
+Move a file or folder to the system trash.
+
+```typescript
+import { Utils } from 'electrobun/bun';
+
+Utils.moveToTrash('/path/to/file');
+```
+
+<ParamField path="path" type="string" required>
+  Path to file or folder to move to trash
+</ParamField>
+
+### showItemInFolder
+
+Show a file or folder in the system file manager.
+
+```typescript
+Utils.showItemInFolder('/path/to/file');
+```
+
+<ParamField path="path" type="string" required>
+  Path to file or folder to reveal
+</ParamField>
+
+### openExternal
+
+Open a URL in the default browser or appropriate application.
+
+```typescript
+const success = Utils.openExternal('https://example.com');
+```
+
+<ParamField path="url" type="string" required>
+  URL to open (http/https, mailto:, custom schemes, etc.)
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if URL was opened successfully
+</ResponseField>
+
+```typescript
+// Open a website
+Utils.openExternal('https://example.com');
+
+// Open email client
+Utils.openExternal('mailto:support@example.com?subject=Help');
+
+// Open custom URL scheme
+Utils.openExternal('slack://open');
+```
+
+### openPath
+
+Open a file or folder with the default application.
+
+```typescript
+const success = Utils.openPath('/path/to/file');
+```
+
+<ParamField path="path" type="string" required>
+  Absolute path to file or folder
+</ParamField>
+
+<ResponseField name="return" type="boolean">
+  `true` if path was opened successfully
+</ResponseField>
+
+```typescript
+// Open a document
+Utils.openPath('/Users/me/Documents/report.pdf');
+
+// Open a folder
+Utils.openPath('/Users/me/Downloads');
+```
+
+## Dialogs
+
+### showNotification
+
+Show a native desktop notification.
+
+```typescript
+Utils.showNotification(options);
+```
+
+<ParamField path="options" type="NotificationOptions" required>
+  <Expandable title="NotificationOptions">
+    <ParamField path="title" type="string" required>
+      Notification title
+    </ParamField>
+    <ParamField path="body" type="string" optional>
+      Main notification text
+    </ParamField>
+    <ParamField path="subtitle" type="string" optional>
+      Subtitle (shown between title and body on macOS)
+    </ParamField>
+    <ParamField path="silent" type="boolean" default="false">
+      If true, no sound will be played
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+```typescript
+// Simple notification
+Utils.showNotification({ title: 'Download Complete' });
+
+// Notification with body
+Utils.showNotification({
+  title: 'New Message',
+  body: 'You have a new message from John',
+});
+
+// Full notification
+Utils.showNotification({
+  title: 'Reminder',
+  subtitle: 'Calendar Event',
+  body: 'Team meeting in 15 minutes',
+  silent: false,
+});
+
+// Silent notification
+Utils.showNotification({
+  title: 'Sync Complete',
+  body: 'All files synchronized',
+  silent: true,
+});
+```
+
+### showMessageBox
+
+Show a native message box dialog.
+
+```typescript
+const { response } = await Utils.showMessageBox(options);
+```
+
+<ParamField path="options" type="MessageBoxOptions" optional>
+  <Expandable title="MessageBoxOptions">
+    <ParamField path="type" type="'info' | 'warning' | 'error' | 'question'" default="'info'">
+      Dialog type
+    </ParamField>
+    <ParamField path="title" type="string" default="''">
+      Dialog window title
+    </ParamField>
+    <ParamField path="message" type="string" default="''">
+      Main message text
+    </ParamField>
+    <ParamField path="detail" type="string" default="''">
+      Additional detail text
+    </ParamField>
+    <ParamField path="buttons" type="string[]" default="['OK']">
+      Array of button labels
+    </ParamField>
+    <ParamField path="defaultId" type="number" default="0">
+      Index of default button (focused on open)
+    </ParamField>
+    <ParamField path="cancelId" type="number" default="-1">
+      Index of cancel button (triggered on Escape)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="MessageBoxResponse">
+  <Expandable title="MessageBoxResponse">
+    <ResponseField name="response" type="number">
+      Index of the clicked button (0-based)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+```typescript
+// Confirmation dialog
+const { response } = await Utils.showMessageBox({
+  type: 'question',
+  title: 'Confirm',
+  message: 'Are you sure you want to delete this file?',
+  buttons: ['Delete', 'Cancel'],
+  defaultId: 1,
+  cancelId: 1,
+});
+
+if (response === 0) {
+  // User clicked Delete
+  deleteFile();
+}
+
+// Error dialog
+await Utils.showMessageBox({
+  type: 'error',
+  title: 'Error',
+  message: 'Failed to save file',
+  detail: 'The disk may be full or you may not have permission.',
+  buttons: ['OK'],
+});
+```
+
+### openFileDialog
+
+Show a native file picker dialog.
+
+```typescript
+const filePaths = await Utils.openFileDialog(options);
+```
+
+<ParamField path="options" type="object" optional>
+  <Expandable title="Options">
+    <ParamField path="startingFolder" type="string" default="'~/'">
+      Initial directory to show
+    </ParamField>
+    <ParamField path="allowedFileTypes" type="string" default="'*'">
+      File type filter (e.g., '*.pdf,*.doc')
+    </ParamField>
+    <ParamField path="canChooseFiles" type="boolean" default="true">
+      Allow selecting files
+    </ParamField>
+    <ParamField path="canChooseDirectory" type="boolean" default="true">
+      Allow selecting directories
+    </ParamField>
+    <ParamField path="allowsMultipleSelection" type="boolean" default="true">
+      Allow selecting multiple items
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="string[]">
+  Array of selected file paths
+</ResponseField>
+
+```typescript
+// Select image files
+const files = await Utils.openFileDialog({
+  startingFolder: '~/Pictures',
+  allowedFileTypes: '*.png,*.jpg,*.jpeg',
+  canChooseFiles: true,
+  canChooseDirectory: false,
+  allowsMultipleSelection: true,
+});
+
+console.log('Selected files:', files);
+```
+
+## Clipboard
+
+### clipboardReadText
+
+Read text from the system clipboard.
+
+```typescript
+const text = Utils.clipboardReadText();
+```
+
+<ResponseField name="return" type="string | null">
+  Clipboard text or null if no text available
+</ResponseField>
+
+### clipboardWriteText
+
+Write text to the system clipboard.
+
+```typescript
+Utils.clipboardWriteText('Hello, clipboard!');
+```
+
+<ParamField path="text" type="string" required>
+  Text to write to clipboard
+</ParamField>
+
+### clipboardReadImage
+
+Read image from the system clipboard.
+
+```typescript
+const image = Utils.clipboardReadImage();
+```
+
+<ResponseField name="return" type="Uint8Array | null">
+  PNG image data or null if no image available
+</ResponseField>
+
+### clipboardWriteImage
+
+Write PNG image to the system clipboard.
+
+```typescript
+Utils.clipboardWriteImage(pngData);
+```
+
+<ParamField path="pngData" type="Uint8Array" required>
+  PNG image data
+</ParamField>
+
+### clipboardClear
+
+Clear the system clipboard.
+
+```typescript
+Utils.clipboardClear();
+```
+
+### clipboardAvailableFormats
+
+Get available clipboard formats.
+
+```typescript
+const formats = Utils.clipboardAvailableFormats();
+```
+
+<ResponseField name="return" type="string[]">
+  Array of format names (e.g., `['text', 'image', 'files', 'html']`)
+</ResponseField>
+
+## Application Control
+
+### quit
+
+Quit the application gracefully.
+
+```typescript
+Utils.quit();
+```
+
+This function:
+1. Emits a `beforeQuit` event (can be prevented)
+2. Stops the native event loop
+3. Waits for native shutdown to complete
+4. Exits the process
+
+```typescript
+// Quit when window closes
+mainWindow.on('close', () => {
+  Utils.quit();
+});
+
+// Handle beforeQuit event
+Electrobun.events.app.on('beforeQuit', (event) => {
+  if (hasUnsavedChanges) {
+    event.preventDefault();
+    promptToSave().then(() => {
+      Utils.quit();
+    });
+  }
+});
+```
+
+## Paths
+
+The `paths` object provides cross-platform paths to common directories. See [Paths API](/api/paths) for details.
+
+```typescript
+import { Utils } from 'electrobun/bun';
+
+console.log('Home:', Utils.paths.home);
+console.log('Documents:', Utils.paths.documents);
+console.log('Downloads:', Utils.paths.downloads);
+```
+
+## Related
+
+- [Paths](/api/paths) - Cross-platform directory paths
+- [BrowserWindow](/api/browser-window) - Window management
+- [Updater](/api/updater) - Application updates

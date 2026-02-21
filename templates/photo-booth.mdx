@@ -1,0 +1,388 @@
+---
+title: Photo Booth
+description: Camera and screen capture app using getUserMedia API
+icon: camera
+---
+
+The Photo Booth template demonstrates media capture capabilities using the `getUserMedia` and `getDisplayMedia` browser APIs. It shows how to access cameras, capture photos, take screenshots, and save images to disk.
+
+## Features
+
+- Camera access with device selection
+- Photo capture with optional countdown timer
+- Screen capture using `getDisplayMedia`
+- Photo gallery with thumbnails
+- Save photos to disk via file dialog
+- RPC for file system operations
+
+## Initialize the Template
+
+Clone the template from the repository:
+
+```bash
+git clone https://github.com/blackboardsh/electrobun.git
+cp -r electrobun/templates/photo-booth my-app
+cd my-app
+bun install
+```
+
+Run the app:
+
+```bash
+bun run dev
+```
+
+## Project Structure
+
+```
+photo-booth/
+├── src/
+│   ├── bun/
+│   │   └── index.ts          # Main process with file saving RPC
+│   └── mainview/
+│       ├── index.html        # Photo booth UI
+│       ├── index.ts          # Camera and capture logic
+│       └── index.css         # Styles
+├── electrobun.config.ts
+└── package.json
+```
+
+## Key Code
+
+### Camera Access
+
+Request camera permission and start streaming:
+
+```typescript src/mainview/index.ts
+private async startCamera() {
+  try {
+    const constraints: MediaStreamConstraints = {
+      video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
+    };
+
+    // Use selected camera if available
+    const selectedCamera = this.cameraSelect.value;
+    if (selectedCamera) {
+      (constraints.video as MediaTrackConstraints).deviceId = selectedCamera;
+    }
+
+    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this.video.srcObject = this.stream;
+    
+    this.setStatus("Camera active - ready to take photos", true);
+    this.captureBtn.disabled = false;
+  } catch (error) {
+    console.error("Error starting camera:", error);
+    this.setStatus(`Camera error: ${error.message}`, false);
+  }
+}
+```
+
+### Enumerate Cameras
+
+List available camera devices:
+
+```typescript
+private async populateCameraList() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  const videoDevices = devices.filter(device => device.kind === "videoinput");
+
+  this.cameraSelect.innerHTML = '<option value="">Select Camera</option>';
+  
+  videoDevices.forEach((device, index) => {
+    const option = document.createElement("option");
+    option.value = device.deviceId;
+    option.textContent = device.label || `Camera ${index + 1}`;
+    this.cameraSelect.appendChild(option);
+  });
+}
+```
+
+### Capture Photo
+
+Capture from video stream to canvas:
+
+```typescript
+private async captureCameraPhoto() {
+  if (!this.stream) return;
+
+  // Optional countdown
+  if (this.timerToggle.checked) {
+    await this.showCountdown();
+  }
+
+  // Draw video frame to canvas
+  const context = this.canvas.getContext("2d");
+  this.canvas.width = this.video.videoWidth;
+  this.canvas.height = this.video.videoHeight;
+  context.drawImage(this.video, 0, 0);
+
+  // Convert to data URL
+  const dataUrl = this.canvas.toDataURL("image/png");
+
+  // Add to gallery
+  const photo: Photo = {
+    id: Date.now().toString(),
+    dataUrl,
+    timestamp: new Date(),
+    type: "camera",
+  };
+
+  this.photos.push(photo);
+  this.addPhotoToGallery(photo);
+}
+```
+
+### Screen Capture
+
+Use `getDisplayMedia` for screen sharing:
+
+```typescript
+private async selectScreen() {
+  try {
+    // Check if getDisplayMedia is available
+    if (navigator.mediaDevices?.getDisplayMedia) {
+      this.stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: false,
+      });
+
+      this.video.srcObject = this.stream;
+      this.setStatus("Screen capture active", true);
+      this.captureBtn.disabled = false;
+
+      // Listen for when user stops sharing
+      const videoTracks = this.stream.getVideoTracks();
+      if (videoTracks.length > 0) {
+        videoTracks[0].addEventListener("ended", () => {
+          this.setStatus("Screen sharing stopped", false);
+          this.captureBtn.disabled = true;
+        });
+      }
+    } else {
+      throw new Error("getDisplayMedia API not available");
+    }
+  } catch (error) {
+    this.setStatus(`Screen capture error: ${error.message}`, false);
+  }
+}
+```
+
+### RPC for Saving Files
+
+Define RPC schema for file operations:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, BrowserView, Utils, type RPCSchema } from "electrobun/bun";
+
+export type PhotoBoothRPC = {
+  bun: RPCSchema<{
+    requests: {
+      savePhoto: {
+        params: {
+          dataUrl: string;
+          filename: string;
+        };
+        response: {
+          success: boolean;
+          path?: string;
+          reason?: string;
+        };
+      };
+    };
+    messages: {};
+  }>;
+  webview: RPCSchema<{
+    requests: {};
+    messages: {};
+  }>;
+};
+```
+
+Implement the RPC handler:
+
+```typescript
+const photoBoothRPC = BrowserView.defineRPC<PhotoBoothRPC>({
+  maxRequestTime: 5000,
+  handlers: {
+    requests: {
+      savePhoto: async ({ dataUrl, filename }) => {
+        // Convert data URL to buffer
+        const base64Data = dataUrl.replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+
+        // Show save dialog
+        const chosenPaths = await Utils.openFileDialog({
+          startingFolder: Bun.env["HOME"] || "/",
+          allowedFileTypes: "png",
+          canChooseFiles: false,
+          canChooseDirectory: true,
+          allowsMultipleSelection: false,
+        });
+
+        if (chosenPaths[0]) {
+          const savePath = `${chosenPaths[0]}/${filename}`;
+          await Bun.write(savePath, buffer);
+          return { success: true, path: savePath };
+        }
+
+        return { success: false, reason: "canceled" };
+      },
+    },
+    messages: {},
+  },
+});
+```
+
+### Save Photo from View
+
+Call the RPC method to save:
+
+```typescript src/mainview/index.ts
+private async saveCurrentPhoto() {
+  const photo = this.photos.find(p => p.id === this.currentPhotoId);
+  if (!photo) return;
+
+  const filename = `${photo.type}-${new Date().toISOString().slice(0, 19).replace(/[:.]/g, "-")}.png`;
+  
+  const result = await electrobun.rpc!.request.savePhoto({
+    dataUrl: photo.dataUrl,
+    filename,
+  });
+
+  if (result.success) {
+    this.showStatus("Photo saved successfully!", "success");
+    console.log("Photo saved to:", result.path);
+  } else if (result.reason === "canceled") {
+    this.showStatus("Save canceled", "info");
+  }
+}
+```
+
+## Features Demonstrated
+
+<CardGroup cols={2}>
+  <Card title="Media Capture" icon="camera">
+    Access camera devices using getUserMedia API
+  </Card>
+  
+  <Card title="Screen Sharing" icon="desktop">
+    Capture screen content with getDisplayMedia
+  </Card>
+  
+  <Card title="Canvas Processing" icon="image">
+    Draw video frames to canvas for capture
+  </Card>
+  
+  <Card title="File Operations" icon="floppy-disk">
+    Save files via RPC and file dialogs
+  </Card>
+</CardGroup>
+
+## Capture Modes
+
+<Tabs>
+  <Tab title="Camera Mode">
+    Camera mode uses `getUserMedia` to access the device camera:
+    
+    - Select from available cameras
+    - Optional 3-second countdown timer
+    - Capture photos at 1280x720 resolution
+    - Save photos with timestamp
+  </Tab>
+  
+  <Tab title="Screen Mode">
+    Screen mode uses `getDisplayMedia` for screen capture:
+    
+    - Select window or entire screen
+    - Capture screenshots of any content
+    - Automatically stops when sharing ends
+    - Great for documentation and tutorials
+  </Tab>
+</Tabs>
+
+## Photo Gallery
+
+Captured photos are displayed in a gallery:
+
+```typescript
+private addPhotoToGallery(photo: Photo) {
+  const photoElement = document.createElement("div");
+  photoElement.className = "photo-item";
+  photoElement.dataset["photoId"] = photo.id;
+
+  const typeIcon = photo.type === "camera" ? "📷" : "🖥️";
+  photoElement.innerHTML = `
+    <img src="${photo.dataUrl}" alt="Captured ${photo.type}">
+    <div class="photo-info">
+      <span class="photo-type">${typeIcon}</span>
+      <span class="photo-time">${photo.timestamp.toLocaleTimeString()}</span>
+    </div>
+  `;
+
+  photoElement.addEventListener("click", () => this.openModal(photo.id));
+  this.gallery.insertBefore(photoElement, this.gallery.firstChild);
+}
+```
+
+## Available Scripts
+
+<CodeGroup>
+```bash Development
+bun run dev
+```
+
+```bash Build
+bun run build
+```
+
+```bash Canary Build
+bun run build:canary
+```
+</CodeGroup>
+
+## Browser API Support
+
+<Note>
+  Media capture APIs depend on the browser engine:
+  
+  - **WKWebView (macOS)**: Supports `getUserMedia`, limited `getDisplayMedia` support
+  - **CEF (all platforms)**: Full support for both APIs
+  
+  To use CEF, set `bundleCEF: true` in `electrobun.config.ts`
+</Note>
+
+## Permissions
+
+<Warning>
+  Camera and screen capture require user permission. The browser will prompt the user on first access.
+</Warning>
+
+## Next Steps
+
+<Steps>
+  <Step title="Test camera access">
+    Run the app and grant camera permission to start capturing
+  </Step>
+  
+  <Step title="Try screen capture">
+    Switch to screen mode and test getDisplayMedia
+  </Step>
+  
+  <Step title="Customize capture">
+    Modify resolution, add filters, or implement video recording
+  </Step>
+  
+  <Step title="Learn about RPC">
+    Understand how [RPC](/guides/inter-process-communication) enables file operations
+  </Step>
+</Steps>
+
+## Source Code
+
+View the complete template source on GitHub:
+[templates/photo-booth](https://github.com/blackboardsh/electrobun/tree/main/templates/photo-booth)

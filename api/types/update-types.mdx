@@ -1,0 +1,239 @@
+---
+title: Update Types
+description: Type definitions for the auto-updater system
+---
+
+## UpdateStatusType
+
+Enum-like type representing the current state of the update process.
+
+### Status Values
+
+- `idle` - No update operation in progress
+- `checking` - Checking for available updates
+- `check-complete` - Update check completed
+- `no-update` - No updates available
+- `update-available` - Update found and available for download
+- `downloading` - Update is being downloaded
+- `download-starting` - Download process is initializing
+- `checking-local-tar` - Checking for local tarball
+- `local-tar-found` - Local tarball file found
+- `local-tar-missing` - Local tarball not found
+- `fetching-patch` - Retrieving patch file
+- `patch-found` - Patch file located
+- `patch-not-found` - Patch file not available
+- `downloading-patch` - Downloading patch file
+- `applying-patch` - Applying patch to existing version
+- `patch-applied` - Patch successfully applied
+- `patch-failed` - Patch application failed
+- `extracting-version` - Extracting version information
+- `patch-chain-complete` - All patches applied successfully
+- `downloading-full-bundle` - Downloading complete update bundle
+- `download-progress` - Download in progress
+- `decompressing` - Decompressing downloaded files
+- `download-complete` - Download finished
+- `applying` - Installing the update
+- `extracting` - Extracting update files
+- `replacing-app` - Replacing application files
+- `launching-new-version` - Starting updated version
+- `complete` - Update process completed
+- `error` - An error occurred
+
+## UpdateStatusDetails
+
+Detailed information about the current update status.
+
+<ParamField path="fromHash" type="string" default="undefined">
+  Hash identifier of the current version
+</ParamField>
+
+<ParamField path="toHash" type="string" default="undefined">
+  Hash identifier of the target version
+</ParamField>
+
+<ParamField path="currentHash" type="string" default="undefined">
+  Hash of the currently running version
+</ParamField>
+
+<ParamField path="latestHash" type="string" default="undefined">
+  Hash of the latest available version
+</ParamField>
+
+<ParamField path="patchNumber" type="number" default="undefined">
+  Current patch being applied (1-indexed)
+</ParamField>
+
+<ParamField path="totalPatchesApplied" type="number" default="undefined">
+  Total number of patches applied during update
+</ParamField>
+
+<ParamField path="progress" type="number" default="undefined">
+  Download progress percentage (0-100)
+</ParamField>
+
+<ParamField path="bytesDownloaded" type="number" default="undefined">
+  Number of bytes downloaded so far
+</ParamField>
+
+<ParamField path="totalBytes" type="number" default="undefined">
+  Total bytes to download
+</ParamField>
+
+<ParamField path="usedPatchPath" type="boolean" default="undefined">
+  Whether the update used incremental patches or full download
+</ParamField>
+
+<ParamField path="errorMessage" type="string" default="undefined">
+  Error message if status is `error`
+</ParamField>
+
+<ParamField path="url" type="string" default="undefined">
+  URL being accessed for the update
+</ParamField>
+
+<ParamField path="zstdPath" type="string" default="undefined">
+  Path to the zstd decompression utility
+</ParamField>
+
+<ParamField path="exitCode" type="number | null" default="undefined">
+  Exit code from external processes (patch, decompress)
+</ParamField>
+
+## UpdateStatusEntry
+
+A timestamped update status record.
+
+<ParamField path="status" type="UpdateStatusType" required>
+  The current status
+</ParamField>
+
+<ParamField path="message" type="string" required>
+  Human-readable status message
+</ParamField>
+
+<ParamField path="timestamp" type="number" required>
+  Unix timestamp (milliseconds) when this status was emitted
+</ParamField>
+
+<ParamField path="details" type="UpdateStatusDetails" default="undefined">
+  Additional details about the status
+</ParamField>
+
+## Usage Example
+
+### Monitoring Update Progress
+
+```typescript
+import { Updater } from '@electrobun/core';
+
+// Subscribe to status changes
+Updater.onStatusChange((entry) => {
+  console.log(`[${entry.status}] ${entry.message}`);
+  
+  if (entry.details?.progress) {
+    console.log(`Progress: ${entry.details.progress}%`);
+  }
+  
+  if (entry.status === 'error') {
+    console.error('Update failed:', entry.details?.errorMessage);
+  }
+  
+  if (entry.status === 'complete') {
+    console.log('Update installed successfully!');
+  }
+});
+
+// Check for updates
+await Updater.checkForUpdate();
+
+// Download and install
+await Updater.downloadUpdate();
+await Updater.applyUpdate();
+```
+
+### Displaying Update Progress
+
+```typescript
+import { Updater, UpdateStatusEntry } from '@electrobun/core';
+
+function showUpdateProgress(entry: UpdateStatusEntry) {
+  const { status, message, details } = entry;
+  
+  switch (status) {
+    case 'downloading':
+    case 'download-progress':
+      if (details?.progress) {
+        updateUI({
+          message: `Downloading: ${details.progress}%`,
+          progress: details.progress
+        });
+      }
+      break;
+      
+    case 'applying-patch':
+      if (details?.patchNumber) {
+        updateUI({
+          message: `Applying patch ${details.patchNumber}...`,
+          indeterminate: true
+        });
+      }
+      break;
+      
+    case 'patch-chain-complete':
+      updateUI({
+        message: `Applied ${details?.totalPatchesApplied} patches`,
+        progress: 100
+      });
+      break;
+      
+    case 'error':
+      showError(details?.errorMessage || 'Update failed');
+      break;
+  }
+}
+
+Updater.onStatusChange(showUpdateProgress);
+```
+
+### Getting Update History
+
+```typescript
+import { Updater } from '@electrobun/core';
+
+// Get all status updates
+const history = Updater.getStatusHistory();
+
+// Find errors
+const errors = history.filter(entry => entry.status === 'error');
+
+// Calculate total download time
+const downloadStart = history.find(e => e.status === 'download-starting');
+const downloadEnd = history.find(e => e.status === 'download-complete');
+if (downloadStart && downloadEnd) {
+  const duration = downloadEnd.timestamp - downloadStart.timestamp;
+  console.log(`Download took ${duration}ms`);
+}
+
+// Clear history
+Updater.clearStatusHistory();
+```
+
+## Patch vs Full Download
+
+The updater uses incremental patches when possible to reduce download size:
+
+```typescript
+Updater.onStatusChange((entry) => {
+  if (entry.status === 'patch-chain-complete') {
+    console.log('Used incremental patches');
+    console.log(`Applied ${entry.details?.totalPatchesApplied} patches`);
+  } else if (entry.status === 'downloading-full-bundle') {
+    console.log('Downloading full update (patches not available)');
+  }
+});
+```
+
+## See Also
+
+- [Updater API](/api/updater)
+- [Update Configuration](/guides/auto-updates)

@@ -1,0 +1,246 @@
+---
+title: Code Signing
+description: Configure code signing and notarization for macOS and Windows apps
+---
+
+Code signing is required for distributing apps on macOS and recommended for Windows to avoid security warnings.
+
+## macOS Code Signing
+
+### Requirements
+
+<Steps>
+  <Step title="Apple Developer Account">
+    You need an active [Apple Developer Program](https://developer.apple.com/programs/) membership ($99/year).
+  </Step>
+
+  <Step title="Developer ID Certificate">
+    Create a **Developer ID Application** certificate in your Apple Developer account:
+    1. Go to Certificates, Identifiers & Profiles
+    2. Create a new certificate
+    3. Select "Developer ID Application"
+    4. Download and install in Keychain Access
+  </Step>
+
+  <Step title="App-Specific Password">
+    Generate an app-specific password for notarization:
+    1. Go to [appleid.apple.com](https://appleid.apple.com)
+    2. Sign in and go to Security
+    3. Generate an app-specific password
+    4. Save it for use in environment variables
+  </Step>
+</Steps>
+
+### Configuration
+
+Enable code signing in your config:
+
+```typescript electrobun.config.ts
+export default {
+  build: {
+    mac: {
+      codesign: true,
+      notarize: true,
+      entitlements: {
+        // Required for Electrobun apps with hardened runtime
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.cs.disable-library-validation": true,
+        
+        // Add permissions as needed:
+        "com.apple.security.device.camera": "This app needs camera access",
+        "com.apple.security.device.microphone": "This app needs microphone access",
+      },
+    },
+  },
+};
+```
+
+### Environment Variables
+
+Set these before building:
+
+```bash
+export ELECTROBUN_DEVELOPER_ID="Developer ID Application: Your Name (TEAM_ID)"
+export ELECTROBUN_APPLEID="your-apple-id@example.com"
+export ELECTROBUN_APPLEIDPASS="xxxx-xxxx-xxxx-xxxx"  # App-specific password
+export ELECTROBUN_TEAMID="YOUR_TEAM_ID"              # 10-character team ID
+```
+
+<Note>
+  Find your Developer ID certificate name in **Keychain Access** → **My Certificates**.
+  It should match exactly, including parentheses and team ID.
+</Note>
+
+### Signing Process
+
+Electrobun signs components in this order:
+
+<Steps>
+  <Step title="Framework Libraries">
+    Signs all `.dylib` files in CEF framework's Libraries folder.
+  </Step>
+
+  <Step title="Frameworks">
+    Signs the CEF framework bundle itself.
+  </Step>
+
+  <Step title="Helper Apps">
+    Signs all CEF helper app executables and bundles:
+    - bun Helper.app
+    - bun Helper (GPU).app
+    - bun Helper (Renderer).app
+    - etc.
+  </Step>
+
+  <Step title="MacOS Binaries">
+    Recursively signs all executables and libraries in `Contents/MacOS/`:
+    - bun runtime
+    - launcher
+    - bspatch, zig-zstd
+    - libNativeWrapper.dylib
+  </Step>
+
+  <Step title="App Bundle">
+    Signs the entire .app bundle with entitlements and hardened runtime.
+  </Step>
+</Steps>
+
+### Notarization
+
+When `notarize: true` is enabled:
+
+<Steps>
+  <Step title="Upload to Apple">
+    The signed app is zipped and uploaded to Apple's notary service using `xcrun notarytool`.
+  </Step>
+
+  <Step title="Wait for Processing">
+    Electrobun waits for Apple to scan and approve the app (typically 1-5 minutes).
+  </Step>
+
+  <Step title="Staple Ticket">
+    The notarization ticket is stapled to the app using `xcrun stapler`, allowing offline verification.
+  </Step>
+</Steps>
+
+<Warning>
+  Notarization can fail if:
+  - Any binary is unsigned or improperly signed
+  - Required entitlements are missing
+  - The app contains unsigned code or modified binaries
+  
+  Check the notarization log with: `xcrun notarytool log --apple-id ... [UUID]`
+</Warning>
+
+### Entitlements Reference
+
+Common entitlements and their required Info.plist keys:
+
+| Entitlement | Info.plist Key | Description |
+|-------------|----------------|-------------|
+| `com.apple.security.device.camera` | `NSCameraUsageDescription` | Camera access |
+| `com.apple.security.device.microphone` | `NSMicrophoneUsageDescription` | Microphone access |
+| `com.apple.security.personal-information.location` | `NSLocationUsageDescription` | Location access |
+| `com.apple.security.files.user-selected.read-write` | `NSDocumentsFolderUsageDescription` | File picker access |
+| `com.apple.security.device.bluetooth` | `NSBluetoothAlwaysUsageDescription` | Bluetooth access |
+
+Electrobun automatically generates Info.plist usage descriptions when you provide entitlements.
+
+### Verification
+
+Verify code signing:
+
+```bash
+# Verify signature
+codesign --verify --deep --strict --verbose=2 MyApp.app
+
+# Check notarization
+spctl --assess --type execute --verbose MyApp.app
+
+# Validate stapled ticket
+stapler validate -v MyApp.app
+```
+
+## Windows Code Signing
+
+Windows code signing is not currently automated in Electrobun, but you can sign the installer manually:
+
+### Using SignTool
+
+```bash
+# Sign the installer executable
+signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com MyApp-Setup.exe
+
+# Verify signature
+signtool verify /pa MyApp-Setup.exe
+```
+
+### Requirements
+
+- **Code Signing Certificate:** Purchase from a Certificate Authority (DigiCert, GlobalSign, etc.)
+- **SignTool:** Included with Windows SDK
+
+<Note>
+  Windows Defender SmartScreen may still show warnings for new apps until they build reputation.
+  This typically requires thousands of downloads from users with SmartScreen enabled.
+</Note>
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml .github/workflows/build.yml
+name: Build and Sign
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+      
+      - name: Install dependencies
+        run: bun install
+      
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          echo $CERTIFICATE_BASE64 | base64 --decode > certificate.p12
+          security create-keychain -p "" build.keychain
+          security import certificate.p12 -k build.keychain -P $CERTIFICATE_PASSWORD -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+          security default-keychain -s build.keychain
+      
+      - name: Build and sign
+        env:
+          ELECTROBUN_DEVELOPER_ID: ${{ secrets.DEVELOPER_ID }}
+          ELECTROBUN_APPLEID: ${{ secrets.APPLE_ID }}
+          ELECTROBUN_APPLEIDPASS: ${{ secrets.APPLE_ID_PASSWORD }}
+          ELECTROBUN_TEAMID: ${{ secrets.TEAM_ID }}
+        run: bun electrobun build --env=stable
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: artifacts/
+```
+
+### Secrets to Configure
+
+- `MACOS_CERTIFICATE` - Base64-encoded .p12 certificate
+- `MACOS_CERTIFICATE_PASSWORD` - Certificate password
+- `DEVELOPER_ID` - Full Developer ID string
+- `APPLE_ID` - Apple ID email
+- `APPLE_ID_PASSWORD` - App-specific password
+- `TEAM_ID` - 10-character team identifier

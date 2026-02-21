@@ -1,80 +1,395 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Build your first Electrobun app in under 5 minutes
 ---
 
-## Get started in three steps
+Get a working Electrobun app running in under 5 minutes. This guide walks you through creating a simple desktop application using the hello-world template.
 
-Get your documentation site running locally and make your first customization.
+## Before you begin
 
-### Step 1: Set up your local environment
+Make sure you have the prerequisites installed for your platform:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- **Bun** runtime (required)
+- Platform-specific build tools (CMake, compilers)
 
-### Step 2: Deploy your changes
+<Card title="Installation guide" icon="download" href="/installation">
+  See the full installation guide for your platform
+</Card>
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+## Create your first app
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+<Steps>
+  <Step title="Initialize a new project">
+    Run the Electrobun CLI to create a new project from a template:
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    ```bash
+    npx electrobun init my-app
+    ```
 
-### Step 3: Go live
+    Select the **hello-world** template when prompted. This creates a minimal app with:
+    - Main process code (Bun)
+    - Webview with HTML/CSS
+    - Basic window configuration
+  </Step>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+  <Step title="Install dependencies">
+    Navigate to your project and install dependencies:
+
+    ```bash
+    cd my-app
+    bun install
+    ```
+
+    This installs Electrobun and TypeScript definitions.
+  </Step>
+
+  <Step title="Run in development mode">
+    Start the development server:
+
+    ```bash
+    bun run dev
+    ```
+
+    A window should open displaying "Hello Electrobun!" with gradient background.
+
+    <Tip>
+    The dev server watches for file changes and automatically reloads your app.
+    </Tip>
+  </Step>
+
+  <Step title="Build for production">
+    Build a distributable executable:
+
+    ```bash
+    bun run build
+    ```
+
+    Find your app in the `build/` directory:
+    - **macOS**: `build/darwin-arm64/` or `build/darwin-x64/`
+    - **Windows**: `build/win32-x64/`
+    - **Linux**: `build/linux-x64/` or `build/linux-arm64/`
+
+    <Note>
+    The build output is a single self-extracting executable that runs without installation.
+    </Note>
+  </Step>
+</Steps>
+
+## Project structure
+
+Your new Electrobun app has this structure:
+
+```
+my-app/
+├── src/
+│   ├── bun/
+│   │   └── index.ts          # Main process (Node.js-like environment)
+│   └── mainview/
+│       ├── index.html         # Webview HTML
+│       ├── index.css          # Webview styles
+│       └── index.ts           # Webview JavaScript
+├── electrobun.config.ts       # App configuration
+├── package.json
+└── tsconfig.json
+```
+
+### Main process (Bun)
+
+The main process runs in a Bun environment and controls your app's lifecycle:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+// Create the main application window
+const mainWindow = new BrowserWindow({
+  title: "Hello Electrobun!",
+  url: "views://mainview/index.html",
+  frame: {
+    width: 800,
+    height: 800,
+    x: 200,
+    y: 200,
+  },
+});
+
+// Quit the app when the main window is closed
+mainWindow.on("close", () => {
+  Utils.quit();
+});
+
+console.log("Hello Electrobun app started!");
+```
+
+### Webview (HTML/CSS/JS)
+
+The webview runs in a Chromium-based browser environment (or system webview):
+
+```html src/mainview/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello Electrobun!</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Hello Electrobun!</h1>
+        <p class="subtitle">A fast, cross-platform desktop app framework</p>
+        
+        <div class="welcome-section">
+            <p>Welcome to your first Electrobun app!</p>
+            
+            <h2>What is Electrobun?</h2>
+            <ul>
+                <li><strong>Fast:</strong> Built on Bun's lightning-fast JavaScript runtime</li>
+                <li><strong>Native:</strong> Access to system APIs like menus and file dialogs</li>
+                <li><strong>Cross-platform:</strong> Works on macOS, Windows, and Linux</li>
+                <li><strong>Web-based UI:</strong> Use familiar HTML, CSS, and JavaScript</li>
+            </ul>
+        </div>
+    </div>
+    <script src="index.js"></script>
+</body>
+</html>
+```
+
+```typescript src/mainview/index.ts
+console.log("Hello Electrobun view loaded!");
+```
+
+### Configuration
+
+The `electrobun.config.ts` file configures your app's metadata and build settings:
+
+```typescript electrobun.config.ts
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "hello-world",
+    identifier: "helloworld.electrobun.dev",
+    version: "0.0.1",
+  },
+  build: {
+    views: {
+      mainview: {
+        entrypoint: "src/mainview/index.ts",
+      },
+    },
+    copy: {
+      "src/mainview/index.html": "views/mainview/index.html",
+      "src/mainview/index.css": "views/mainview/index.css",
+    },
+    mac: {
+      bundleCEF: false,
+    },
+    linux: {
+      bundleCEF: false,
+    },
+    win: {
+      bundleCEF: false,
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+<Tip>
+Setting `bundleCEF: false` keeps your app small (~12MB) by using the system webview. Set to `true` to bundle Chromium (~60-80MB) for consistent rendering across platforms.
+</Tip>
+
+## Customize your app
+
+Now that you have a working app, try these modifications:
+
+### Change the window size
+
+Edit `src/bun/index.ts`:
+
+```typescript src/bun/index.ts
+const mainWindow = new BrowserWindow({
+  title: "My Custom App",
+  url: "views://mainview/index.html",
+  frame: {
+    width: 1200,  // Wider window
+    height: 900,  // Taller window
+    x: 100,
+    y: 100,
+  },
+});
+```
+
+### Add custom styles
+
+Edit `src/mainview/index.css` to change colors, fonts, or layout. The template includes a gradient background and responsive design.
+
+### Add interactivity
+
+Edit `src/mainview/index.ts` to add JavaScript:
+
+```typescript src/mainview/index.ts
+console.log("Hello Electrobun view loaded!");
+
+// Add a button click handler
+document.addEventListener("DOMContentLoaded", () => {
+  const button = document.createElement("button");
+  button.textContent = "Click me!";
+  button.onclick = () => {
+    alert("Button clicked!");
+  };
+  document.body.appendChild(button);
+});
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
+You've built your first Electrobun app! Here's what to explore next:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Configuration" icon="gear" href="/configuration/config-file">
+    Learn about all configuration options
+  </Card>
+  <Card title="BrowserWindow API" icon="window-maximize" href="/api/browser-window">
+    Create and control windows
+  </Card>
+  <Card title="RPC Communication" icon="arrows-left-right" href="/guides/inter-process-communication">
+    Pass data between main and webview processes
+  </Card>
+  <Card title="Native Menus" icon="bars" href="/api/application-menu">
+    Add application and context menus
+  </Card>
+  <Card title="File Dialogs" icon="folder-open" href="/api/utils">
+    Open and save files
+  </Card>
+  <Card title="App Distribution" icon="box" href="/distribution/packaging">
+    Package and distribute your app
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common tasks
+
+### Open external links
+
+Allow links to open in the user's default browser:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+const mainWindow = new BrowserWindow({
+  // ... config
+});
+
+// Handle external links
+mainWindow.on("navigate", (event) => {
+  if (event.url.startsWith("http")) {
+    Utils.openExternal(event.url);
+    event.preventDefault();
+  }
+});
+```
+
+### Load local files
+
+Use the `views://` protocol to load local files:
+
+```typescript src/bun/index.ts
+const mainWindow = new BrowserWindow({
+  url: "views://mainview/index.html",
+  // ...
+});
+```
+
+Files in the `views/` directory (configured via `build.copy`) are accessible via this protocol.
+
+### Handle app lifecycle
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils, App } from "electrobun/bun";
+
+// Run code when app is ready
+App.on("ready", () => {
+  console.log("App is ready!");
+});
+
+// Save state before quitting
+App.on("before-quit", () => {
+  console.log("App is about to quit");
+  // Save user data, close connections, etc.
+});
+```
+
+## Templates
+
+Electrobun provides several starter templates:
+
+<CardGroup cols={2}>
+  <Card title="hello-world" icon="hand-wave">
+    Minimal app with a single window
+  </Card>
+  <Card title="react-tailwind-vite" icon="react">
+    React + Tailwind CSS + Vite setup
+  </Card>
+  <Card title="svelte" icon="code">
+    Svelte + Vite template
+  </Card>
+  <Card title="photo-booth" icon="camera">
+    Camera access and image capture
+  </Card>
+</CardGroup>
+
+<Card title="Explore all templates" icon="folder" href="/templates/overview">
+  View detailed documentation for each template
+</Card>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Window doesn't open">
+    Check the console output for errors. Common issues:
+    - Missing dependencies (run `bun install`)
+    - Build tools not installed (see [Installation](/installation))
+    - Port conflicts (try closing other Electrobun apps)
+  </Accordion>
+
+  <Accordion title="Build fails">
+    Verify platform-specific requirements:
+    - **macOS**: Xcode Command Line Tools and CMake
+    - **Windows**: Visual Studio Build Tools and CMake
+    - **Linux**: build-essential, CMake, GTK3, and WebKit2GTK
+
+    See the [Installation guide](/installation) for detailed instructions.
+  </Accordion>
+
+  <Accordion title="Changes not reflected">
+    In development mode, the app should auto-reload. If not:
+    - Stop the dev server (Ctrl+C)
+    - Run `bun run dev` again
+    - Check for TypeScript errors in the console
+  </Accordion>
+
+  <Accordion title="App size is too large">
+    If your app is larger than expected:
+    - Set `bundleCEF: false` in `electrobun.config.ts` to use system webview
+    - Remove unused dependencies from `package.json`
+    - Use tree-shaking for your frontend framework
+
+    System webview apps are typically ~12MB. Bundling CEF adds ~60-80MB.
+  </Accordion>
+</AccordionGroup>
+
+## Get help
+
+Need assistance? Join the Electrobun community:
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/ueKE4tjaCE">
+    Ask questions and get help
+  </Card>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/blackboardsh/electrobun/issues">
+    Report bugs and request features
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/blackboardsh/electrobun/tree/main/templates">
+    Browse example code
+  </Card>
+</CardGroup>

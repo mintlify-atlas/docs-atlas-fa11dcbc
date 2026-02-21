@@ -1,122 +1,154 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Electrobun",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#5B7FFF",
+    "light": "#7B9FFF",
+    "dark": "#3B5FDF"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/blackboardsh/electrobun"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/blackboardsh/electrobun"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "installation"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "concepts/architecture",
+              "concepts/main-process",
+              "concepts/webview-process",
+              "concepts/rpc-communication",
+              "concepts/building-and-packaging"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Guides",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "guides/creating-windows",
+              "guides/working-with-views",
+              "guides/inter-process-communication",
+              "guides/menus-and-trays",
+              "guides/auto-updates",
+              "guides/native-integrations",
+              "guides/platform-specific-features"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Configuration",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "configuration/config-file",
+              "configuration/build-options",
+              "configuration/platform-options",
+              "configuration/runtime-options"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "cli/init",
+              "cli/build",
+              "cli/commands"
+            ]
+          },
+          {
+            "group": "Distribution",
+            "pages": [
+              "distribution/packaging",
+              "distribution/code-signing",
+              "distribution/auto-updates",
+              "distribution/release-channels"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Main Process",
             "pages": [
-              "api-reference/introduction"
+              "api/browser-window",
+              "api/browser-view",
+              "api/tray",
+              "api/application-menu",
+              "api/context-menu",
+              "api/updater",
+              "api/utils",
+              "api/global-shortcut",
+              "api/screen",
+              "api/session",
+              "api/socket",
+              "api/paths"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Webview Process",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/electroview",
+              "api/webview-tag"
+            ]
+          },
+          {
+            "group": "RPC System",
+            "pages": [
+              "api/rpc-overview",
+              "api/create-rpc",
+              "api/define-electrobun-rpc"
+            ]
+          },
+          {
+            "group": "Types & Interfaces",
+            "pages": [
+              "api/types/window-options",
+              "api/types/view-options",
+              "api/types/menu-types",
+              "api/types/update-types",
+              "api/types/event-types"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Templates",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "templates/overview"
+            ]
+          },
+          {
+            "group": "Available Templates",
+            "pages": [
+              "templates/hello-world",
+              "templates/react-tailwind-vite",
+              "templates/svelte",
+              "templates/multitab-browser",
+              "templates/photo-booth"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

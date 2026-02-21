@@ -1,0 +1,294 @@
+---
+title: Installation
+description: Prerequisites and setup instructions for building Electrobun apps
+---
+
+This guide covers everything you need to install and configure to build Electrobun apps.
+
+## System requirements
+
+Electrobun supports development on macOS, Windows, and Linux. The requirements vary by platform.
+
+### macOS
+
+<Steps>
+  <Step title="Supported versions">
+    **macOS 14+ (Sonoma or later)**
+
+    Electrobun officially supports macOS 14 and later on both Intel and Apple Silicon Macs.
+  </Step>
+
+  <Step title="Install Xcode Command Line Tools">
+    Required for compiling native components:
+
+    ```bash
+    xcode-select --install
+    ```
+  </Step>
+
+  <Step title="Install CMake">
+    Install via Homebrew:
+
+    ```bash
+    brew install cmake
+    ```
+  </Step>
+</Steps>
+
+### Windows
+
+<Steps>
+  <Step title="Supported versions">
+    **Windows 11 or later**
+
+    Electrobun officially supports Windows 11+. The x64 binary runs on both x64 and ARM Windows devices (ARM devices use automatic emulation).
+  </Step>
+
+  <Step title="Install Visual Studio Build Tools">
+    Download and install [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/) with C++ development tools, or install the full Visual Studio IDE with C++ workload.
+  </Step>
+
+  <Step title="Install CMake">
+    Download and install CMake from [cmake.org](https://cmake.org/download/).
+  </Step>
+</Steps>
+
+### Linux
+
+<Steps>
+  <Step title="Supported distributions">
+    **Ubuntu 22.04+ (officially supported)**
+
+    Other distributions with GTK3 and WebKit2GTK 4.1 support work but are community-supported.
+  </Step>
+
+  <Step title="Install build tools and dependencies">
+    On Ubuntu/Debian-based systems:
+
+    ```bash
+    sudo apt install build-essential cmake pkg-config \
+      libgtk-3-dev libwebkit2gtk-4.1-dev \
+      libayatana-appindicator3-dev librsvg2-dev
+    ```
+
+    <Note>
+    These dependencies are required for building apps. Your users only need the runtime versions of these libraries, which are typically pre-installed on modern Linux distributions.
+    </Note>
+  </Step>
+</Steps>
+
+## Install Bun
+
+Electrobun uses Bun as its JavaScript runtime and package manager. You must have Bun installed on your development machine.
+
+<CodeGroup>
+```bash macOS/Linux
+curl -fsSL https://bun.sh/install | bash
+```
+
+```powershell Windows
+powershell -c "irm bun.sh/install.ps1 | iex"
+```
+</CodeGroup>
+
+Verify the installation:
+
+```bash
+bun --version
+```
+
+<Tip>
+Electrobun bundles a specific version of Bun with your app at build time, so your users don't need Bun installed.
+</Tip>
+
+## Install Node.js (optional)
+
+While Electrobun uses Bun, some development tools and npm packages may require Node.js:
+
+- Download from [nodejs.org](https://nodejs.org/)
+- Or install via a version manager like [nvm](https://github.com/nvm-sh/nvm)
+
+## Platform-specific notes
+
+### macOS: Code signing and notarization
+
+If you plan to distribute your app to other macOS users:
+
+- **Code signing**: Requires an Apple Developer account ($99/year)
+- **Notarization**: Required for apps distributed outside the Mac App Store
+
+Configure in `electrobun.config.ts`:
+
+```typescript electrobun.config.ts
+export default {
+  // ...
+  build: {
+    mac: {
+      codesign: true,
+      notarize: true,
+      entitlements: {
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.cs.disable-library-validation": true,
+      },
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+<Note>
+The entitlements shown above are required for Electrobun apps with hardened runtime (required for notarization) due to Bun's JIT compilation.
+</Note>
+
+### Windows: WebView2
+
+Electrobun uses Microsoft Edge WebView2 on Windows. It's included with Windows 11 by default, but you can configure your app to bundle it:
+
+```typescript electrobun.config.ts
+export default {
+  // ...
+  build: {
+    win: {
+      bundleCEF: false, // Use system WebView2 (recommended)
+      // bundleCEF: true, // Bundle Chromium Embedded Framework (~70MB)
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+### Linux: System webview vs CEF
+
+Linux apps can use the system WebKitGTK or bundle Chromium Embedded Framework:
+
+```typescript electrobun.config.ts
+export default {
+  // ...
+  build: {
+    linux: {
+      bundleCEF: false, // Use system WebKitGTK (~12MB app)
+      // bundleCEF: true, // Bundle CEF (~60-80MB app)
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+<Warning>
+When `bundleCEF: false`, users need WebKitGTK 4.1 installed. This is pre-installed on Ubuntu 22.04+ and most modern Linux distributions.
+</Warning>
+
+Electrobun uses a dual-binary approach on Linux:
+- `libNativeWrapper.so` - GTK-only (~1.46MB)
+- `libNativeWrapper_cef.so` - CEF-enabled (~3.47MB)
+
+The CLI automatically selects the correct binary based on your `bundleCEF` setting.
+
+## Architecture support
+
+### macOS
+
+Electrobun supports:
+- **ARM64** (Apple Silicon: M1, M2, M3, M4)
+- **x64** (Intel Macs)
+
+Universal binaries are not yet supported. Build separately for each architecture.
+
+### Windows
+
+Electrobun builds target:
+- **x64** (64-bit Intel/AMD)
+
+ARM Windows devices run the x64 binary through Windows' automatic emulation layer.
+
+### Linux
+
+Electrobun supports:
+- **x64** (64-bit Intel/AMD)
+- **ARM64** (64-bit ARM, including Raspberry Pi 4+)
+
+## Verify your installation
+
+Create a test project to verify everything is set up correctly:
+
+```bash
+npx electrobun init my-test-app
+cd my-test-app
+bun install
+bun run dev
+```
+
+If a window opens with "Hello Electrobun!", you're all set!
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Create your first Electrobun app
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/config-file">
+    Learn about app configuration options
+  </Card>
+  <Card title="Building" icon="hammer" href="/cli/build">
+    Build and package your app for distribution
+  </Card>
+  <Card title="Templates" icon="folder" href="/templates/overview">
+    Explore starter templates
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="macOS: Command line tools not found">
+    Install Xcode Command Line Tools:
+
+    ```bash
+    xcode-select --install
+    ```
+
+    If already installed, reset the path:
+
+    ```bash
+    sudo xcode-select --reset
+    ```
+  </Accordion>
+
+  <Accordion title="Windows: CMake not found">
+    Make sure CMake is in your PATH. You may need to restart your terminal or computer after installing CMake.
+
+    Verify installation:
+
+    ```powershell
+    cmake --version
+    ```
+  </Accordion>
+
+  <Accordion title="Linux: Missing GTK or WebKit headers">
+    Install development packages:
+
+    ```bash
+    sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
+    ```
+
+    For other distributions, search for equivalent packages:
+    - **Fedora**: `gtk3-devel webkit2gtk4.1-devel`
+    - **Arch**: `gtk3 webkit2gtk-4.1`
+  </Accordion>
+
+  <Accordion title="Permission denied errors on Linux">
+    Make sure your user has permission to install packages:
+
+    ```bash
+    sudo usermod -aG sudo $USER
+    ```
+
+    Log out and back in for changes to take effect.
+  </Accordion>
+</AccordionGroup>
+
+## Get help
+
+If you encounter issues during installation:
+
+- Check the [GitHub Issues](https://github.com/blackboardsh/electrobun/issues)
+- Ask in the [Discord community](https://discord.gg/ueKE4tjaCE)
+- Review the [Build Documentation](https://github.com/blackboardsh/electrobun/blob/main/BUILD.md)

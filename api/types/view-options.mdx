@@ -1,0 +1,143 @@
+---
+title: ViewOptions
+description: Configuration options for creating browser views
+---
+
+## BrowserViewOptions
+
+Configuration object used when creating a new `BrowserView` instance.
+
+### Properties
+
+<ParamField path="url" type="string | null" default="null">
+  URL to load in the view. Mutually exclusive with `html`
+</ParamField>
+
+<ParamField path="html" type="string | null" default="null">
+  HTML content to load in the view. Mutually exclusive with `url`
+</ParamField>
+
+<ParamField path="preload" type="string | null" default="null">
+  Path to a JavaScript file to execute before page scripts run
+</ParamField>
+
+<ParamField path="renderer" type="'native' | 'cef'" default="buildConfig.defaultRenderer">
+  Which rendering engine to use:
+  - `native`: WKWebView (macOS), WebView2 (Windows)
+  - `cef`: Chromium Embedded Framework
+</ParamField>
+
+<ParamField path="partition" type="string | null" default="null">
+  Session partition identifier for isolating cookies, storage, and cache. Use format:
+  - `persist:name` for persistent storage
+  - `ephemeral:name` for in-memory only storage
+</ParamField>
+
+<ParamField path="frame" type="object" required>
+  The view's position and dimensions within the window
+  
+  <Expandable title="properties">
+    <ParamField path="x" type="number" default="0">
+      Horizontal position in pixels from the left edge of the window
+    </ParamField>
+    
+    <ParamField path="y" type="number" default="0">
+      Vertical position in pixels from the top edge of the window
+    </ParamField>
+    
+    <ParamField path="width" type="number" default="800">
+      View width in pixels
+    </ParamField>
+    
+    <ParamField path="height" type="number" default="600">
+      View height in pixels
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="rpc" type="T" default="undefined">
+  RPC schema for communication between browser and Bun processes. Generic type parameter.
+</ParamField>
+
+<ParamField path="hostWebviewId" type="number" default="undefined">
+  ID of the parent webview when creating nested views (webview tags)
+</ParamField>
+
+<ParamField path="autoResize" type="boolean" default="true">
+  When `true`, the view automatically resizes to match the window dimensions
+</ParamField>
+
+<ParamField path="windowId" type="number" default="0">
+  ID of the window to attach this view to
+</ParamField>
+
+<ParamField path="navigationRules" type="string | null" default="null">
+  JSON string defining URL navigation rules for the view
+</ParamField>
+
+<ParamField path="sandbox" type="boolean" default="false">
+  Sandbox mode: when `true`, disables RPC and only allows event emission. Use for untrusted content (remote URLs) to prevent malicious sites from accessing internal APIs, creating OOPIFs, or communicating with Bun.
+</ParamField>
+
+<ParamField path="startTransparent" type="boolean" default="false">
+  Set the view as transparent at creation (before first paint)
+</ParamField>
+
+<ParamField path="startPassthrough" type="boolean" default="false">
+  Set the view as click-through at creation (before first paint). When enabled, mouse events pass through to content below.
+</ParamField>
+
+## Usage Example
+
+```typescript
+import { BrowserView } from '@electrobun/core';
+
+const view = new BrowserView({
+  url: 'https://example.com',
+  frame: {
+    x: 0,
+    y: 0,
+    width: 1024,
+    height: 768
+  },
+  renderer: 'native',
+  partition: 'persist:myapp',
+  autoResize: true
+});
+```
+
+## Session Partitions
+
+Use partitions to isolate storage between views:
+
+```typescript
+// Persistent storage (survives app restarts)
+const mainView = new BrowserView({
+  url: 'https://app.example.com',
+  partition: 'persist:main'
+});
+
+// Ephemeral storage (cleared on app close)
+const tempView = new BrowserView({
+  url: 'https://temp.example.com',
+  partition: 'ephemeral:temp'
+});
+```
+
+## Transparent and Passthrough Views
+
+Create overlay views with transparency and click-through:
+
+```typescript
+const overlayView = new BrowserView({
+  html: '<div style="background: rgba(0,0,0,0.5)">Overlay</div>',
+  startTransparent: true,
+  startPassthrough: true,
+  frame: { x: 0, y: 0, width: 800, height: 600 }
+});
+```
+
+## See Also
+
+- [BrowserView API](/api/browser-view)
+- [Window Options](/api/types/window-options)

@@ -1,0 +1,339 @@
+---
+title: Event Types
+description: Type definitions for window and webview events
+---
+
+## Window Event Types
+
+Event data types for `BrowserWindow` events.
+
+### CloseEvent
+
+Emitted when a window is closed.
+
+<ParamField path="id" type="number" required>
+  The window ID
+</ParamField>
+
+```typescript
+window.on('close', (event: { data: { id: number } }) => {
+  console.log(`Window ${event.data.id} closed`);
+});
+```
+
+### ResizeEvent
+
+Emitted when a window is resized or moved.
+
+<ParamField path="id" type="number" required>
+  The window ID
+</ParamField>
+
+<ParamField path="x" type="number" required>
+  New horizontal position in pixels
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  New vertical position in pixels
+</ParamField>
+
+<ParamField path="width" type="number" required>
+  New window width in pixels
+</ParamField>
+
+<ParamField path="height" type="number" required>
+  New window height in pixels
+</ParamField>
+
+```typescript
+window.on('resize', (event: { 
+  data: { 
+    id: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }
+}) => {
+  console.log(`Window resized to ${event.data.width}x${event.data.height}`);
+});
+```
+
+### MoveEvent
+
+Emitted when a window is moved.
+
+<ParamField path="id" type="number" required>
+  The window ID
+</ParamField>
+
+<ParamField path="x" type="number" required>
+  New horizontal position in pixels
+</ParamField>
+
+<ParamField path="y" type="number" required>
+  New vertical position in pixels
+</ParamField>
+
+```typescript
+window.on('move', (event: { 
+  data: { 
+    id: number;
+    x: number;
+    y: number;
+  }
+}) => {
+  console.log(`Window moved to (${event.data.x}, ${event.data.y})`);
+});
+```
+
+### FocusEvent
+
+Emitted when a window gains focus.
+
+<ParamField path="id" type="number" required>
+  The window ID
+</ParamField>
+
+```typescript
+window.on('focus', (event: { data: { id: number } }) => {
+  console.log(`Window ${event.data.id} focused`);
+});
+```
+
+## WebView Event Types
+
+Event data types for `BrowserView` events.
+
+### NavigationEvent
+
+Emitted for navigation-related events (`will-navigate`, `did-navigate`, `did-navigate-in-page`, `did-commit-navigation`).
+
+<ParamField path="detail" type="string" required>
+  The URL being navigated to
+</ParamField>
+
+```typescript
+view.on('will-navigate', (event: { detail: string }) => {
+  console.log(`Navigating to: ${event.detail}`);
+});
+```
+
+### DomReadyEvent
+
+Emitted when the DOM is ready.
+
+<ParamField path="detail" type="string" required>
+  The current URL
+</ParamField>
+
+```typescript
+view.on('dom-ready', (event: { detail: string }) => {
+  console.log('DOM ready for:', event.detail);
+});
+```
+
+### NewWindowOpenEvent
+
+Emitted when the page requests to open a new window.
+
+<ParamField path="detail" type="string | object" required>
+  Either a URL string or an object with detailed information:
+  
+  <Expandable title="properties">
+    <ParamField path="url" type="string" required>
+      The URL to open
+    </ParamField>
+    
+    <ParamField path="isCmdClick" type="boolean" required>
+      Whether Cmd/Ctrl key was pressed
+    </ParamField>
+    
+    <ParamField path="modifierFlags" type="number" default="undefined">
+      Keyboard modifier flags
+    </ParamField>
+    
+    <ParamField path="targetDisposition" type="number" default="undefined">
+      How the new window should be opened
+    </ParamField>
+    
+    <ParamField path="userGesture" type="boolean" default="undefined">
+      Whether triggered by user gesture
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+```typescript
+view.on('new-window-open', (event) => {
+  if (typeof event.detail === 'string') {
+    console.log('Open URL:', event.detail);
+  } else {
+    console.log('Open URL:', event.detail.url);
+    console.log('Cmd+Click:', event.detail.isCmdClick);
+  }
+});
+```
+
+### DownloadEvent
+
+Emitted for download-related events (`download-started`, `download-progress`, `download-completed`, `download-failed`).
+
+<ParamField path="detail" type="string" required>
+  Download information as a JSON string (parse to access properties)
+</ParamField>
+
+```typescript
+view.on('download-started', (event: { detail: string }) => {
+  const downloadInfo = JSON.parse(event.detail);
+  console.log('Download started:', downloadInfo);
+});
+
+view.on('download-progress', (event: { detail: string }) => {
+  const progress = JSON.parse(event.detail);
+  console.log(`Download progress: ${progress.percent}%`);
+});
+```
+
+### HostMessageEvent
+
+Emitted when a webview tag sends a message to the host.
+
+<ParamField path="detail" type="string" required>
+  Message content as a string
+</ParamField>
+
+```typescript
+view.on('host-message', (event: { detail: string }) => {
+  console.log('Received from webview tag:', event.detail);
+});
+```
+
+## Usage Examples
+
+### Window Event Handling
+
+```typescript
+import { BrowserWindow } from '@electrobun/core';
+
+const window = new BrowserWindow({
+  title: 'My App',
+  frame: { x: 100, y: 100, width: 800, height: 600 }
+});
+
+window.on('close', (event) => {
+  console.log(`Window ${event.data.id} is closing`);
+  // Cleanup code here
+});
+
+window.on('resize', (event) => {
+  const { width, height } = event.data;
+  console.log(`Window resized to ${width}x${height}`);
+});
+
+window.on('focus', (event) => {
+  console.log('Window focused');
+});
+```
+
+### WebView Navigation Tracking
+
+```typescript
+import { BrowserView } from '@electrobun/core';
+
+const view = new BrowserView({
+  url: 'https://example.com'
+});
+
+view.on('will-navigate', (event) => {
+  console.log('About to navigate to:', event.detail);
+  // Could block navigation here if needed
+});
+
+view.on('did-navigate', (event) => {
+  console.log('Navigation completed:', event.detail);
+});
+
+view.on('dom-ready', (event) => {
+  console.log('DOM is ready, can inject scripts now');
+});
+```
+
+### Download Management
+
+```typescript
+const downloads = new Map();
+
+view.on('download-started', (event) => {
+  const info = JSON.parse(event.detail);
+  downloads.set(info.id, { started: Date.now(), ...info });
+  console.log('Download started:', info.filename);
+});
+
+view.on('download-progress', (event) => {
+  const progress = JSON.parse(event.detail);
+  console.log(`${progress.filename}: ${progress.percent}%`);
+});
+
+view.on('download-completed', (event) => {
+  const info = JSON.parse(event.detail);
+  console.log('Download completed:', info.path);
+  downloads.delete(info.id);
+});
+
+view.on('download-failed', (event) => {
+  const error = JSON.parse(event.detail);
+  console.error('Download failed:', error.message);
+});
+```
+
+### WebView Tag Communication
+
+```typescript
+// In the host webview
+view.on('host-message', (event) => {
+  const message = event.detail;
+  console.log('Message from webview tag:', message);
+  
+  // Respond to the webview tag
+  // (implementation depends on your setup)
+});
+
+view.on('new-window-open', (event) => {
+  if (typeof event.detail !== 'string') {
+    const { url, isCmdClick } = event.detail;
+    if (isCmdClick) {
+      // Open in new window
+      new BrowserWindow({ url });
+    } else {
+      // Navigate current view
+      view.loadURL(url);
+    }
+  }
+});
+```
+
+## Event Names
+
+Window events:
+- `close`
+- `resize`
+- `move`
+- `focus`
+
+WebView events:
+- `will-navigate`
+- `did-navigate`
+- `did-navigate-in-page`
+- `did-commit-navigation`
+- `dom-ready`
+- `new-window-open`
+- `host-message`
+- `download-started`
+- `download-progress`
+- `download-completed`
+- `download-failed`
+
+## See Also
+
+- [BrowserWindow API](/api/browser-window)
+- [BrowserView API](/api/browser-view)

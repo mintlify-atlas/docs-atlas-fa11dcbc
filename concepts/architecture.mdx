@@ -1,0 +1,240 @@
+---
+title: Architecture Overview
+description: Understanding Electrobun's dual-process architecture and how it combines Bun, native code, and webviews
+---
+
+# Architecture Overview
+
+Electrobun is a desktop application framework that combines **Bun's JavaScript runtime** with **native desktop capabilities** through a clean, secure architecture. Understanding this architecture is key to building powerful Electrobun applications.
+
+## High-Level Architecture
+
+Electrobun applications follow a **dual-process architecture** similar to Electron, but with important differences:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Electrobun Application                │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  ┌──────────────────┐         ┌──────────────────┐    │
+│  │  Main Process    │ ◄─RPC──► │ Webview Process  │    │
+│  │  (Bun Runtime)   │         │ (HTML/CSS/JS)    │    │
+│  └────────┬─────────┘         └──────────────────┘    │
+│           │                                             │
+│           ▼                                             │
+│  ┌──────────────────┐                                  │
+│  │  Native Layer    │                                  │
+│  │  (Zig + C++)     │                                  │
+│  └──────────────────┘                                  │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Core Components
+
+### 1. Main Process (Bun)
+
+The main process is powered by **Bun**, a fast all-in-one JavaScript runtime. This process:
+
+- Runs your backend TypeScript/JavaScript code
+- Has full access to Node.js/Bun APIs (file system, network, etc.)
+- Manages application lifecycle (startup, shutdown, updates)
+- Creates and controls windows and webviews
+- Handles native system integration (menus, trays, dialogs)
+
+<Info>
+The main process runs with full system privileges and should handle all sensitive operations like file I/O, database access, and API calls.
+</Info>
+
+### 2. Webview Process (Renderer)
+
+Each window contains one or more **webviews** that render your UI:
+
+- Runs HTML, CSS, and JavaScript
+- Sandboxed environment (can be further restricted)
+- Communicates with main process via RPC
+- Uses system webview (WebKit on macOS, WebView2 on Windows, WebKitGTK on Linux)
+- Optional CEF (Chromium Embedded Framework) support for consistent cross-platform rendering
+
+<Note>
+Webviews are isolated from the main process for security. They cannot directly access the file system or native APIs - they must use RPC to communicate with the main process.
+</Note>
+
+### 3. Native Layer (Zig + C++)
+
+The native layer bridges Bun with platform-specific APIs:
+
+- Written in **Zig** for cross-platform compatibility and performance
+- Provides FFI (Foreign Function Interface) bindings to Bun
+- Handles window management, webview creation, and system integration
+- Uses platform-specific APIs:
+  - **macOS**: Cocoa, WebKit
+  - **Windows**: Win32 API, WebView2
+  - **Linux**: GTK3, WebKitGTK
+
+## Process Communication Flow
+
+### Window Creation Flow
+
+```typescript
+// 1. Main process (Bun) creates a window
+import { BrowserWindow } from "electrobun/bun";
+
+const mainWindow = new BrowserWindow({
+  title: "My App",
+  url: "views://mainview/index.html",
+  frame: { width: 800, height: 600, x: 100, y: 100 }
+});
+
+// 2. Bun calls native layer via FFI
+// 3. Native layer creates platform-specific window
+// 4. Webview is created and attached to window
+// 5. HTML content is loaded into webview
+```
+
+### RPC Communication Flow
+
+```typescript
+// Main process defines RPC handler
+const rpc = BrowserView.defineRPC({
+  handlers: {
+    requests: {
+      saveFile: async ({ path, data }) => {
+        await Bun.write(path, data);
+        return { success: true };
+      }
+    }
+  }
+});
+
+// Webview calls RPC method
+import { Electroview } from "electrobun/browser";
+
+const result = await view.rpc.request.saveFile({
+  path: "/path/to/file.txt",
+  data: "Hello World"
+});
+```
+
+<Tip>
+RPC calls are **encrypted** using per-webview AES-GCM keys for security, even over localhost WebSocket connections.
+</Tip>
+
+## Key Architectural Principles
+
+### Security-First Design
+
+1. **Process Isolation**: Webviews run in separate processes with restricted privileges
+2. **Encrypted RPC**: All communication between processes is encrypted
+3. **Sandbox Mode**: Optional strict sandbox for untrusted content (remote URLs)
+4. **Navigation Rules**: Control which URLs webviews can navigate to
+
+```typescript
+const secureView = new BrowserWindow({
+  url: "https://untrusted-content.com",
+  sandbox: true, // Disables RPC, only allows events
+  navigationRules: JSON.stringify([
+    { type: "allow", pattern: "https://untrusted-content.com/*" },
+    { type: "deny", pattern: "*" }
+  ])
+});
+```
+
+### Performance Optimization
+
+1. **Native Webviews**: Uses system webview by default (~12MB app size)
+2. **Optional CEF**: Bundle Chromium for consistent rendering across platforms
+3. **Fast Startup**: Bun's fast runtime enables quick application startup
+4. **Small Updates**: Binary diffing (bsdiff) for tiny update packages
+
+### Developer Experience
+
+1. **TypeScript Everywhere**: Write TypeScript in both main and webview processes
+2. **Type-Safe RPC**: Full TypeScript support for RPC communication
+3. **Hot Reload**: Fast development iteration (in dev mode)
+4. **Integrated Tooling**: Built-in bundler, updater, and packaging
+
+## File Structure
+
+A typical Electrobun project structure:
+
+```
+my-electrobun-app/
+├── electrobun.config.ts    # Build configuration
+├── src/
+│   ├── bun/                # Main process code
+│   │   └── index.ts        # Entry point
+│   └── mainview/           # Webview code
+│       ├── index.html      # HTML entry
+│       ├── index.ts        # TypeScript entry
+│       └── index.css       # Styles
+├── package.json
+└── tsconfig.json
+```
+
+## Build and Runtime Flow
+
+### Development Mode
+
+```bash
+bun dev
+```
+
+1. Electrobun bundles your TypeScript code
+2. Copies static assets to build directory
+3. Launches native launcher with Bun runtime
+4. Bun executes your main process code
+5. Windows/webviews are created and loaded
+
+### Production Build
+
+```bash
+bun run build
+```
+
+1. Optimizes and bundles all code
+2. Creates self-extracting executable
+3. Packages Bun runtime, native binaries, and your code
+4. Generates platform-specific installers (optional)
+5. Creates update packages using binary diffing
+
+<Note>
+Production builds use a **self-extracting archive** that unpacks on first run, enabling small app sizes and efficient updates.
+</Note>
+
+## Platform-Specific Details
+
+### macOS
+- Uses **WKWebView** (Safari's engine) by default
+- App bundle structure: `.app` package
+- Code signing and notarization supported
+- Transparent windows and custom title bars
+
+### Windows
+- Uses **WebView2** (Edge's engine) by default
+- Single `.exe` installer
+- Automatic WebView2 runtime detection/installation
+- System tray integration
+
+### Linux
+- Uses **WebKitGTK** 4.1 by default
+- AppImage or platform-specific packages
+- GTK3-based native UI elements
+- System tray via libayatana-appindicator
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Main Process" icon="server" href="/concepts/main-process">
+    Deep dive into the Bun-powered main process
+  </Card>
+  <Card title="Webview Process" icon="window" href="/concepts/webview-process">
+    Learn about webview creation and management
+  </Card>
+  <Card title="RPC Communication" icon="arrows-left-right" href="/concepts/rpc-communication">
+    Master type-safe inter-process communication
+  </Card>
+  <Card title="Building & Packaging" icon="box" href="/concepts/building-and-packaging">
+    Package and distribute your application
+  </Card>
+</CardGroup>

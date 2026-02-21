@@ -1,0 +1,534 @@
+---
+title: Native Integrations
+description: Use native OS features like notifications, dialogs, clipboard, and file system
+---
+
+## Overview
+
+Electrobun provides APIs for common native OS integrations:
+
+- Notifications
+- Dialogs (file picker, message boxes)
+- Clipboard access
+- File system operations
+- External URLs and paths
+- System paths
+
+## Notifications
+
+Show native desktop notifications:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+Utils.showNotification({
+  title: "Download Complete",
+  body: "Your file has been downloaded",
+});
+```
+
+### Notification Options
+
+```typescript
+type NotificationOptions = {
+  title: string;      // Required: notification title
+  body?: string;      // Optional: main message
+  subtitle?: string;  // Optional: subtitle (macOS shows between title and body)
+  silent?: boolean;   // Optional: don't play sound
+};
+```
+
+### Examples
+
+<CodeGroup>
+```typescript Simple
+Utils.showNotification({
+  title: "Task Complete",
+});
+```
+
+```typescript With Body
+Utils.showNotification({
+  title: "New Message",
+  body: "You have a message from Alice",
+});
+```
+
+```typescript Full Options
+Utils.showNotification({
+  title: "Reminder",
+  subtitle: "Calendar Event",
+  body: "Team meeting in 15 minutes",
+  silent: false,
+});
+```
+
+```typescript Silent
+Utils.showNotification({
+  title: "Sync Complete",
+  body: "All files synchronized",
+  silent: true,
+});
+```
+</CodeGroup>
+
+## File Dialogs
+
+Open native file picker dialogs:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+const files = await Utils.openFileDialog({
+  startingFolder: "~/Documents",
+  allowedFileTypes: "*.pdf,*.txt",
+  canChooseFiles: true,
+  canChooseDirectory: false,
+  allowsMultipleSelection: true,
+});
+
+console.log("Selected files:", files);
+```
+
+### File Dialog Options
+
+```typescript
+type FileDialogOptions = {
+  startingFolder?: string;           // Starting directory (default: "~/")
+  allowedFileTypes?: string;         // Filter: "*.pdf" or "*" (default: "*")
+  canChooseFiles?: boolean;          // Allow file selection (default: true)
+  canChooseDirectory?: boolean;      // Allow folder selection (default: true)
+  allowsMultipleSelection?: boolean; // Multiple files/folders (default: true)
+};
+```
+
+### Examples
+
+<CodeGroup>
+```typescript Single File
+const [file] = await Utils.openFileDialog({
+  allowsMultipleSelection: false,
+  canChooseDirectory: false,
+});
+
+if (file) {
+  const content = await Bun.file(file).text();
+  console.log(content);
+}
+```
+
+```typescript Folder Selection
+const [folder] = await Utils.openFileDialog({
+  canChooseFiles: false,
+  canChooseDirectory: true,
+  allowsMultipleSelection: false,
+});
+
+console.log("Selected folder:", folder);
+```
+
+```typescript Image Files Only
+const images = await Utils.openFileDialog({
+  allowedFileTypes: "*.png,*.jpg,*.jpeg,*.gif",
+  startingFolder: "~/Pictures",
+});
+```
+</CodeGroup>
+
+## Message Boxes
+
+Show native dialog boxes with buttons:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+const { response } = await Utils.showMessageBox({
+  type: "question",
+  title: "Confirm Delete",
+  message: "Are you sure you want to delete this file?",
+  detail: "This action cannot be undone.",
+  buttons: ["Cancel", "Delete"],
+  defaultId: 0,  // "Cancel" is default
+  cancelId: 0,   // "Cancel" on Escape
+});
+
+if (response === 1) {
+  // User clicked "Delete"
+  console.log("Deleting file...");
+}
+```
+
+### Message Box Options
+
+```typescript
+type MessageBoxOptions = {
+  type?: "info" | "warning" | "error" | "question";  // Dialog icon
+  title?: string;        // Window title
+  message?: string;      // Main message
+  detail?: string;       // Additional detail text
+  buttons?: string[];    // Button labels (default: ["OK"])
+  defaultId?: number;    // Default button index
+  cancelId?: number;     // Button to trigger on Escape (-1 for none)
+};
+```
+
+### Examples
+
+<CodeGroup>
+```typescript Confirmation
+const { response } = await Utils.showMessageBox({
+  type: "question",
+  title: "Save Changes?",
+  message: "Do you want to save your changes?",
+  buttons: ["Don't Save", "Cancel", "Save"],
+  defaultId: 2,
+  cancelId: 1,
+});
+
+if (response === 2) {
+  await saveChanges();
+} else if (response === 0) {
+  discardChanges();
+}
+```
+
+```typescript Error Dialog
+await Utils.showMessageBox({
+  type: "error",
+  title: "Error",
+  message: "Failed to save file",
+  detail: "Permission denied: /path/to/file",
+  buttons: ["OK"],
+});
+```
+
+```typescript Warning
+const { response } = await Utils.showMessageBox({
+  type: "warning",
+  title: "Warning",
+  message: "This will overwrite existing data",
+  buttons: ["Cancel", "Continue"],
+  defaultId: 0,
+});
+```
+</CodeGroup>
+
+## Clipboard
+
+Access the system clipboard:
+
+### Text Operations
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Write text
+Utils.clipboardWriteText("Hello, clipboard!");
+
+// Read text
+const text = Utils.clipboardReadText();
+console.log(text);  // "Hello, clipboard!" or null
+```
+
+### Image Operations
+
+```typescript
+// Write PNG image
+const pngData = await Bun.file("image.png").arrayBuffer();
+Utils.clipboardWriteImage(new Uint8Array(pngData));
+
+// Read image
+const imageData = Utils.clipboardReadImage();
+if (imageData) {
+  await Bun.write("clipboard-image.png", imageData);
+}
+```
+
+### Clipboard Management
+
+```typescript
+// Check available formats
+const formats = Utils.clipboardAvailableFormats();
+console.log(formats);  // ["text", "image", "files", "html"]
+
+// Clear clipboard
+Utils.clipboardClear();
+```
+
+## External URLs and Paths
+
+### Open URLs
+
+Open URLs in the default browser:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Open website
+Utils.openExternal("https://electrobun.dev");
+
+// Open email
+Utils.openExternal("mailto:support@example.com?subject=Help");
+
+// Open custom URL scheme
+Utils.openExternal("slack://open");
+```
+
+### Open Files and Folders
+
+Open files with their default application:
+
+```typescript
+// Open PDF with default viewer
+Utils.openPath("/Users/me/Documents/report.pdf");
+
+// Open folder in file manager
+Utils.openPath("/Users/me/Downloads");
+```
+
+### Show in Folder
+
+Reveal a file in the file manager:
+
+```typescript
+// Show file in Finder/Explorer
+Utils.showItemInFolder("/Users/me/Documents/report.pdf");
+```
+
+## File System
+
+### Move to Trash
+
+Safely move files to trash/recycle bin:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Move to trash instead of permanent deletion
+Utils.moveToTrash("/path/to/file.txt");
+```
+
+<Note>
+`moveToTrash` is safer than `fs.unlink` because users can recover files from trash.
+</Note>
+
+## System Paths
+
+Access common system directories:
+
+```typescript
+import { Utils } from "electrobun/bun";
+
+// Common OS paths
+console.log(Utils.paths.home);       // User home directory
+console.log(Utils.paths.documents);  // ~/Documents
+console.log(Utils.paths.downloads);  // ~/Downloads
+console.log(Utils.paths.desktop);    // ~/Desktop
+console.log(Utils.paths.pictures);   // ~/Pictures
+console.log(Utils.paths.music);      // ~/Music
+console.log(Utils.paths.videos);     // ~/Videos
+
+// App-specific paths
+console.log(Utils.paths.appData);    // Platform app data dir
+console.log(Utils.paths.userData);    // Your app's data dir
+console.log(Utils.paths.cache);      // Platform cache dir
+console.log(Utils.paths.userCache);  // Your app's cache dir
+console.log(Utils.paths.logs);       // Platform logs dir
+console.log(Utils.paths.userLogs);   // Your app's logs dir
+console.log(Utils.paths.temp);       // Temporary directory
+console.log(Utils.paths.config);     // Config directory
+```
+
+### Platform-Specific Paths
+
+<Tabs>
+  <Tab title="macOS">
+    ```typescript
+    Utils.paths.home         // /Users/username
+    Utils.paths.appData      // ~/Library/Application Support
+    Utils.paths.cache        // ~/Library/Caches
+    Utils.paths.logs         // ~/Library/Logs
+    Utils.paths.userData     // ~/Library/Application Support/com.myapp/channel
+    ```
+  </Tab>
+
+  <Tab title="Windows">
+    ```typescript
+    Utils.paths.home         // C:\Users\username
+    Utils.paths.appData      // C:\Users\username\AppData\Local
+    Utils.paths.cache        // C:\Users\username\AppData\Local
+    Utils.paths.logs         // C:\Users\username\AppData\Local
+    Utils.paths.userData     // C:\Users\username\AppData\Local\com.myapp\channel
+    ```
+  </Tab>
+
+  <Tab title="Linux">
+    ```typescript
+    Utils.paths.home         // /home/username
+    Utils.paths.appData      // ~/.local/share
+    Utils.paths.cache        // ~/.cache
+    Utils.paths.logs         // ~/.local/state
+    Utils.paths.userData     // ~/.local/share/com.myapp/channel
+    ```
+  </Tab>
+</Tabs>
+
+### Using App-Specific Paths
+
+```typescript
+import { Utils } from "electrobun/bun";
+import { join } from "path";
+
+// Save user data
+const dataPath = join(Utils.paths.userData, "settings.json");
+await Bun.write(dataPath, JSON.stringify({ theme: "dark" }));
+
+// Save cache
+const cachePath = join(Utils.paths.userCache, "thumbnails");
+await Bun.write(join(cachePath, "image.png"), imageData);
+
+// Write logs
+const logPath = join(Utils.paths.userLogs, "app.log");
+await Bun.write(logPath, `[${new Date()}] App started\n`, { append: true });
+```
+
+## Complete Example
+
+Here's a complete example using multiple integrations:
+
+```typescript src/bun/fileManager.ts
+import { Utils } from "electrobun/bun";
+import { join } from "path";
+
+export async function exportFile(content: string): Promise<void> {
+  try {
+    // Ask user where to save
+    const [folder] = await Utils.openFileDialog({
+      canChooseFiles: false,
+      canChooseDirectory: true,
+      allowsMultipleSelection: false,
+    });
+
+    if (!folder) {
+      return; // User canceled
+    }
+
+    const filePath = join(folder, "export.txt");
+    await Bun.write(filePath, content);
+
+    // Show success notification
+    Utils.showNotification({
+      title: "Export Complete",
+      body: `File saved to ${filePath}`,
+    });
+
+    // Ask if user wants to open the file
+    const { response } = await Utils.showMessageBox({
+      type: "question",
+      title: "Export Complete",
+      message: "File exported successfully",
+      detail: "Would you like to open it now?",
+      buttons: ["No", "Open File", "Show in Folder"],
+      defaultId: 1,
+    });
+
+    if (response === 1) {
+      Utils.openPath(filePath);
+    } else if (response === 2) {
+      Utils.showItemInFolder(filePath);
+    }
+  } catch (error) {
+    // Show error dialog
+    await Utils.showMessageBox({
+      type: "error",
+      title: "Export Failed",
+      message: "Could not export file",
+      detail: error.message,
+      buttons: ["OK"],
+    });
+  }
+}
+
+export async function importFile(): Promise<string | null> {
+  const [file] = await Utils.openFileDialog({
+    allowedFileTypes: "*.txt,*.md",
+    canChooseDirectory: false,
+    allowsMultipleSelection: false,
+  });
+
+  if (!file) return null;
+
+  const content = await Bun.file(file).text();
+  
+  Utils.showNotification({
+    title: "Import Complete",
+    body: `Imported ${file}`,
+  });
+
+  return content;
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use notifications sparingly">
+    Only show notifications for important events:
+
+    ```typescript
+    // Good: Important completion
+    Utils.showNotification({ title: "Download Complete" });
+
+    // Bad: Too frequent
+    Utils.showNotification({ title: "Processing..." });
+    ```
+  </Accordion>
+
+  <Accordion title="Validate file paths">
+    Check if files exist before using them:
+
+    ```typescript
+    const [file] = await Utils.openFileDialog({ /* ... */ });
+    
+    if (file && await Bun.file(file).exists()) {
+      const content = await Bun.file(file).text();
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle dialog cancellations">
+    Users can cancel dialogs:
+
+    ```typescript
+    const files = await Utils.openFileDialog();
+    
+    if (files.length === 0) {
+      console.log("User canceled");
+      return;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Use app-specific paths">
+    Store data in appropriate directories:
+
+    ```typescript
+    // Good: App-specific path
+    const path = join(Utils.paths.userData, "data.db");
+
+    // Bad: Hard-coded path
+    const path = "/Users/me/.myapp/data.db";
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Auto-Updates" icon="download" href="/guides/auto-updates">
+    Implement automatic updates
+  </Card>
+  <Card title="Platform-Specific Features" icon="desktop" href="/guides/platform-specific-features">
+    Handle platform differences
+  </Card>
+</CardGroup>

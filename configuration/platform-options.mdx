@@ -1,0 +1,371 @@
+---
+title: Platform Options
+description: Platform-specific configuration for macOS, Windows, and Linux
+---
+
+## Overview
+
+Electrobun allows you to configure platform-specific build options for macOS, Windows, and Linux. These settings control rendering engines, code signing, icons, and platform-specific features.
+
+## macOS Configuration
+
+Configure macOS-specific build options under `build.mac`:
+
+### Renderer Settings
+
+<ParamField path="build.mac.bundleCEF" type="boolean" default="false">
+  Bundle CEF (Chromium Embedded Framework) instead of using the native macOS WebView (WKWebView).
+  
+  - `true`: Use CEF for consistent cross-platform rendering and advanced features
+  - `false`: Use native WKWebView for smaller app size and better system integration
+  
+  ```typescript
+  build: {
+    mac: {
+      bundleCEF: true,
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField path="build.mac.defaultRenderer" type="'native' | 'cef'" default="'native'">
+  Default renderer for webviews when not explicitly specified in window creation.
+  
+  ```typescript
+  build: {
+    mac: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+  }
+  ```
+</ParamField>
+
+### Code Signing & Notarization
+
+<ParamField path="build.mac.codesign" type="boolean" default="false">
+  Enable code signing for macOS builds. Required for distribution outside the Mac App Store.
+  
+  Requires:
+  - Apple Developer account
+  - Valid signing certificate in keychain
+  - Proper entitlements configuration
+  
+  ```typescript
+  build: {
+    mac: {
+      codesign: true,
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField path="build.mac.notarize" type="boolean" default="false">
+  Enable notarization for macOS builds. Requires `codesign` to be enabled.
+  
+  Notarization is Apple's automated security scan that allows your app to run on macOS without security warnings.
+  
+  Requires:
+  - Code signing enabled
+  - Apple Developer account credentials
+  - App-specific password for notarization service
+  
+  ```typescript
+  build: {
+    mac: {
+      codesign: true,
+      notarize: true,
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField path="build.mac.entitlements" type="Record<string, boolean | string | string[]>">
+  macOS entitlements for code signing. Entitlements declare the capabilities your app needs to function.
+  
+  Common entitlements:
+  - `com.apple.security.cs.allow-jit` - Allow JIT compilation (required for JavaScript engines)
+  - `com.apple.security.cs.allow-unsigned-executable-memory` - Allow unsigned executable memory
+  - `com.apple.security.cs.disable-library-validation` - Disable library validation for native modules
+  - `com.apple.security.network.client` - Allow outgoing network connections
+  - `com.apple.security.network.server` - Allow incoming network connections
+  
+  ```typescript
+  build: {
+    mac: {
+      entitlements: {
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.cs.allow-unsigned-executable-memory": true,
+        "com.apple.security.network.client": true,
+      },
+    },
+  }
+  ```
+</ParamField>
+
+### Icons & Assets
+
+<ParamField path="build.mac.icons" type="string" default="icon.iconset">
+  Path to `.iconset` folder containing app icons.
+  
+  The iconset should contain icons at various sizes:
+  - icon_16x16.png
+  - icon_16x16@2x.png
+  - icon_32x32.png
+  - icon_32x32@2x.png
+  - icon_128x128.png
+  - icon_128x128@2x.png
+  - icon_256x256.png
+  - icon_256x256@2x.png
+  - icon_512x512.png
+  - icon_512x512@2x.png
+  
+  ```typescript
+  build: {
+    mac: {
+      icons: "assets/icon.iconset",
+    },
+  }
+  ```
+</ParamField>
+
+### Chromium Flags
+
+<ParamField path="build.mac.chromiumFlags" type="Record<string, string | true>">
+  Custom Chromium command-line flags to pass to CEF during initialization. Only applies when `bundleCEF` is enabled.
+  
+  Keys are flag names without the `--` prefix. Use `true` for switch-only flags, or a string for flags that take a value.
+  
+  Common flags:
+  - `disable-gpu` - Disable GPU acceleration
+  - `remote-debugging-port` - Enable DevTools protocol on specified port
+  - `user-agent` - Set custom user agent string
+  - `show-paint-rects` - Show painted regions (debugging)
+  - `show-composited-layer-borders` - Show layer borders (debugging)
+  
+  ```typescript
+  build: {
+    mac: {
+      bundleCEF: true,
+      chromiumFlags: {
+        "disable-gpu": true,
+        "remote-debugging-port": "9333",
+        "user-agent": "MyApp/1.0 (Macintosh)",
+      },
+    },
+  }
+  ```
+</ParamField>
+
+## Windows Configuration
+
+Configure Windows-specific build options under `build.win`:
+
+### Renderer Settings
+
+<ParamField path="build.win.bundleCEF" type="boolean" default="false">
+  Bundle CEF (Chromium Embedded Framework) instead of using WebView2.
+  
+  - `true`: Use CEF for consistent cross-platform rendering
+  - `false`: Use native WebView2 (requires WebView2 runtime installed)
+  
+  ```typescript
+  build: {
+    win: {
+      bundleCEF: true,
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField path="build.win.defaultRenderer" type="'native' | 'cef'" default="'native'">
+  Default renderer for webviews when not explicitly specified in window creation.
+  
+  ```typescript
+  build: {
+    win: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+  }
+  ```
+</ParamField>
+
+### Icons
+
+<ParamField path="build.win.icon" type="string">
+  Path to application icon (`.ico` format).
+  
+  Used for:
+  - Installer/extractor wrapper
+  - Desktop shortcuts
+  - Taskbar icon
+  
+  Should include multiple sizes (16x16, 32x32, 48x48, 256x256) for best results.
+  
+  ```typescript
+  build: {
+    win: {
+      icon: "assets/icon.ico",
+    },
+  }
+  ```
+</ParamField>
+
+### Chromium Flags
+
+<ParamField path="build.win.chromiumFlags" type="Record<string, string | true>">
+  Custom Chromium command-line flags to pass to CEF during initialization. Only applies when `bundleCEF` is enabled.
+  
+  Keys are flag names without the `--` prefix. Use `true` for switch-only flags, or a string for flags that take a value.
+  
+  ```typescript
+  build: {
+    win: {
+      bundleCEF: true,
+      chromiumFlags: {
+        "disable-gpu": true,
+        "remote-debugging-port": "9333",
+        "user-agent": "MyApp/1.0 (Windows)",
+      },
+    },
+  }
+  ```
+</ParamField>
+
+## Linux Configuration
+
+Configure Linux-specific build options under `build.linux`:
+
+### Renderer Settings
+
+<ParamField path="build.linux.bundleCEF" type="boolean" default="false">
+  Bundle CEF (Chromium Embedded Framework) instead of using GTKWebKit.
+  
+  Recommended on Linux for advanced layer compositing features and consistent rendering.
+  
+  - `true`: Use CEF for consistent cross-platform rendering
+  - `false`: Use native GTKWebKit
+  
+  ```typescript
+  build: {
+    linux: {
+      bundleCEF: true,
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField path="build.linux.defaultRenderer" type="'native' | 'cef'" default="'native'">
+  Default renderer for webviews when not explicitly specified in window creation.
+  
+  ```typescript
+  build: {
+    linux: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+    },
+  }
+  ```
+</ParamField>
+
+### Icons
+
+<ParamField path="build.linux.icon" type="string">
+  Path to application icon (PNG format recommended).
+  
+  Used for:
+  - Desktop entries
+  - Window icons
+  - Taskbar icon
+  
+  Should be at least 256x256 pixels for best results.
+  
+  ```typescript
+  build: {
+    linux: {
+      icon: "assets/icon.png",
+    },
+  }
+  ```
+</ParamField>
+
+### Chromium Flags
+
+<ParamField path="build.linux.chromiumFlags" type="Record<string, string | true>">
+  Custom Chromium command-line flags to pass to CEF during initialization. Only applies when `bundleCEF` is enabled.
+  
+  Keys are flag names without the `--` prefix. Use `true` for switch-only flags, or a string for flags that take a value.
+  
+  ```typescript
+  build: {
+    linux: {
+      bundleCEF: true,
+      chromiumFlags: {
+        "disable-gpu": true,
+        "remote-debugging-port": "9333",
+        "user-agent": "MyApp/1.0 (Linux)",
+      },
+    },
+  }
+  ```
+</ParamField>
+
+## Complete Cross-Platform Example
+
+Here's a complete example showing platform-specific configuration:
+
+```typescript
+import type { ElectrobunConfig } from "electrobun";
+
+export default {
+  app: {
+    name: "My App",
+    identifier: "com.example.myapp",
+    version: "1.0.0",
+  },
+  build: {
+    mac: {
+      codesign: true,
+      notarize: true,
+      bundleCEF: true,
+      defaultRenderer: "cef",
+      icons: "assets/icon.iconset",
+      entitlements: {
+        "com.apple.security.cs.allow-jit": true,
+        "com.apple.security.network.client": true,
+      },
+      chromiumFlags: {
+        "user-agent": "MyApp/1.0 (Macintosh)",
+      },
+    },
+    win: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+      icon: "assets/icon.ico",
+      chromiumFlags: {
+        "user-agent": "MyApp/1.0 (Windows)",
+      },
+    },
+    linux: {
+      bundleCEF: true,
+      defaultRenderer: "cef",
+      icon: "assets/icon.png",
+      chromiumFlags: {
+        "user-agent": "MyApp/1.0 (Linux)",
+      },
+    },
+  },
+} satisfies ElectrobunConfig;
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Build Options" icon="hammer" href="/configuration/build-options">
+    Configure bundler and build outputs
+  </Card>
+  <Card title="Runtime Options" icon="play" href="/configuration/runtime-options">
+    Configure runtime behavior
+  </Card>
+</CardGroup>

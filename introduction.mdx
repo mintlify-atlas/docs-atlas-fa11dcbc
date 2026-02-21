@@ -1,0 +1,145 @@
+---
+title: Introduction to Electrobun
+description: Build ultra fast, tiny, and cross-platform desktop applications with TypeScript
+---
+
+<img className="block" src="/images/hero.png" alt="Electrobun Hero" />
+
+## What is Electrobun?
+
+Electrobun is a complete **solution-in-a-box** for building, updating, and shipping ultra fast, tiny, and cross-platform desktop applications written in TypeScript. Under the hood it uses [Bun](https://bun.sh) to execute the main process and bundle webview TypeScript, with native bindings written in [Zig](https://ziglang.org/).
+
+## Why Electrobun?
+
+<CardGroup cols={2}>
+  <Card title="Lightning fast" icon="bolt">
+    Built on Bun's high-performance JavaScript runtime with native bindings in Zig for maximum speed
+  </Card>
+  <Card title="Tiny bundle size" icon="feather">
+    Apps start at ~12MB when using system webview. Updates can be as small as 14KB using binary diffing
+  </Card>
+  <Card title="TypeScript everywhere" icon="code">
+    Write TypeScript for both main process and webviews without configuration headaches
+  </Card>
+  <Card title="Cross-platform" icon="desktop">
+    Ship to macOS, Windows, and Linux from a single codebase
+  </Card>
+  <Card title="Built-in updates" icon="arrows-rotate">
+    Integrated update system downloads tiny patches between versions using bsdiff
+  </Card>
+  <Card title="Complete tooling" icon="wrench">
+    Everything you need: CLI, build system, RPC, and native APIs in one tightly integrated workflow
+  </Card>
+</CardGroup>
+
+## Key features
+
+### Write TypeScript everywhere
+
+No webpack configuration, no babel setup, no transpiler complexity. Just write TypeScript for your main process and webviews, and Electrobun handles the rest.
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Utils } from "electrobun/bun";
+
+const mainWindow = new BrowserWindow({
+  title: "My App",
+  url: "views://mainview/index.html",
+  frame: { width: 1200, height: 800 },
+});
+
+mainWindow.on("close", () => {
+  Utils.quit();
+});
+```
+
+### Process isolation with typed RPC
+
+Main and webview processes are isolated for security and stability. Communication happens through a fast, type-safe RPC system that's easy to implement.
+
+<CodeGroup>
+```typescript Main process (Bun)
+import { createRPC } from "electrobun/bun";
+
+const rpc = createRPC(mainWindow, {
+  requests: {
+    getUserData: async () => {
+      return { name: "Alice", id: 123 };
+    },
+  },
+});
+```
+
+```typescript View process
+import { createRPC } from "electrobun/view";
+
+const rpc = createRPC();
+
+const userData = await rpc.requests.getUserData();
+console.log(userData); // { name: "Alice", id: 123 }
+```
+</CodeGroup>
+
+### Native desktop APIs
+
+Access native functionality through a clean, consistent API across all platforms:
+
+- **Windows**: BrowserWindow, BrowserView, multiple windows
+- **Menus**: Application menus, context menus, system tray
+- **Dialogs**: File open/save, message boxes, notifications
+- **System**: Global shortcuts, screen info, clipboard
+- **Updates**: Automatic updates with binary diffing
+
+### Small, self-extracting bundles
+
+Electrobun apps are distributed as single executable files that self-extract and run:
+
+- **~12MB** base size when using system webview
+- **~60-80MB** when bundling Chromium Embedded Framework (CEF)
+- **14KB+** update patches using bsdiff binary diffing
+- **No installer** required - just run the executable
+
+## Platform support
+
+| Platform | Status | Architectures |
+|----------|--------|---------------|
+| macOS 14+ | Official | ARM64 (Apple Silicon), x64 (Intel) |
+| Windows 11+ | Official | x64 |
+| Ubuntu 22.04+ | Official | x64, ARM64 |
+| Other Linux | Community | x64, ARM64 (with gtk3, webkit2gtk-4.1) |
+
+<Note>
+Windows ARM devices run the x64 binary through Windows' automatic emulation layer.
+</Note>
+
+## Apps built with Electrobun
+
+<CardGroup cols={2}>
+  <Card title="Co(lab)" icon="browser" href="https://blackboard.sh/colab/">
+    A hybrid web browser + code editor for deep work
+  </Card>
+  <Card title="Audio TTS" icon="microphone" href="https://github.com/blackboardsh/audio-tts">
+    Desktop text-to-speech app using Qwen3-TTS for voice design and generation
+  </Card>
+</CardGroup>
+
+## Ready to build?
+
+Get started with Electrobun in under 5 minutes:
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Create your first Electrobun app
+</Card>
+
+## Community and support
+
+<CardGroup cols={3}>
+  <Card title="Discord" icon="discord" href="https://discord.gg/ueKE4tjaCE">
+    Join the conversation
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/blackboardsh/electrobun">
+    Star the repo and contribute
+  </Card>
+  <Card title="X/Twitter" icon="x-twitter" href="https://twitter.com/BlackboardTech">
+    Follow for updates
+  </Card>
+</CardGroup>

@@ -1,0 +1,315 @@
+---
+title: Svelte Template
+description: Svelte 5 app with Vite HMR for fast, reactive development
+icon: bolt
+---
+
+This template uses Svelte 5 to create a fast, reactive desktop app. With Vite's hot module replacement, you get instant feedback as you develop your UI.
+
+## Features
+
+- Svelte 5 with runes (`$state`, `$derived`, etc.)
+- TypeScript support
+- Vite for fast builds and HMR
+- Scoped styles in components
+- Automatic dev server detection
+
+## Initialize the Template
+
+Clone the template from the repository:
+
+```bash
+git clone https://github.com/blackboardsh/electrobun.git
+cp -r electrobun/templates/svelte my-app
+cd my-app
+bun install
+```
+
+## Development Modes
+
+### Standard Development
+
+Run without HMR:
+
+```bash
+bun run dev
+```
+
+### HMR Development
+
+Run with hot module replacement:
+
+```bash
+bun run dev:hmr
+```
+
+Changes to Svelte components update instantly without losing state.
+
+## Project Structure
+
+```
+svelte/
+├── src/
+│   ├── bun/
+│   │   └── index.ts          # Main process with HMR detection
+│   └── mainview/
+│       ├── App.svelte        # Main Svelte component
+│       ├── main.ts           # Svelte entry point
+│       └── index.html        # HTML template
+├── electrobun.config.ts      # Electrobun config
+├── vite.config.ts            # Vite configuration
+├── svelte.config.js          # Svelte configuration
+└── package.json
+```
+
+## Key Code
+
+### Svelte Component with Runes
+
+Svelte 5 introduces runes for reactive state:
+
+```svelte src/mainview/App.svelte
+<script lang="ts">
+  let count = $state(0);
+
+  function increment() {
+    count += 1;
+  }
+
+  function reset() {
+    count = 0;
+  }
+</script>
+
+<main>
+  <div class="container">
+    <h1>Svelte + Electrobun</h1>
+    
+    <div class="card">
+      <h2>Interactive Counter</h2>
+      <div class="button-group">
+        <button class="primary" onclick={increment}>
+          Count: {count}
+        </button>
+        <button class="secondary" onclick={reset}>
+          Reset
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<style>
+  main {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #ff3e00 0%, #ff6b35 100%);
+  }
+
+  .button-group {
+    display: flex;
+    gap: 12px;
+  }
+
+  button.primary {
+    background: #ff3e00;
+    color: white;
+  }
+</style>
+```
+
+### HMR Detection
+
+The Bun process detects the Vite dev server:
+
+```typescript src/bun/index.ts
+import { BrowserWindow, Updater, Utils } from "electrobun/bun";
+
+const DEV_SERVER_PORT = 5173;
+const DEV_SERVER_URL = `http://localhost:${DEV_SERVER_PORT}`;
+
+async function getMainViewUrl(): Promise<string> {
+  const channel = await Updater.localInfo.channel();
+  if (channel === "dev") {
+    try {
+      await fetch(DEV_SERVER_URL, { method: "HEAD" });
+      console.log(`HMR enabled: Using Vite dev server`);
+      return DEV_SERVER_URL;
+    } catch {
+      console.log("Vite dev server not running");
+    }
+  }
+  return "views://mainview/index.html";
+}
+```
+
+### Vite Configuration
+
+Vite is configured for Svelte:
+
+```typescript vite.config.ts
+import { defineConfig } from "vite";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+
+export default defineConfig({
+  plugins: [svelte()],
+  build: {
+    outDir: "dist/views/mainview",
+    rollupOptions: {
+      input: "src/mainview/index.html",
+    },
+  },
+});
+```
+
+## Available Scripts
+
+<CodeGroup>
+```bash Development (no HMR)
+bun run dev
+```
+
+```bash Development (with HMR)
+bun run dev:hmr
+```
+
+```bash Build
+bun run build
+```
+
+```bash Production Build
+bun run build:prod
+```
+</CodeGroup>
+
+## Svelte 5 Features
+
+<CardGroup cols={2}>
+  <Card title="Runes" icon="wand-magic-sparkles">
+    New reactivity primitives like `$state`, `$derived`, and `$effect`
+  </Card>
+  
+  <Card title="Scoped Styles" icon="paintbrush">
+    Component styles are automatically scoped
+  </Card>
+  
+  <Card title="TypeScript" icon="code">
+    Full TypeScript support in components
+  </Card>
+  
+  <Card title="Performance" icon="gauge-high">
+    Faster runtime and smaller bundle sizes
+  </Card>
+</CardGroup>
+
+## Reactive State
+
+Svelte 5 runes make reactivity explicit:
+
+```svelte
+<script lang="ts">
+  // Reactive state
+  let count = $state(0);
+  
+  // Derived value
+  let doubled = $derived(count * 2);
+  
+  // Side effect
+  $effect(() => {
+    console.log(`Count is now ${count}`);
+  });
+</script>
+
+<p>Count: {count}</p>
+<p>Doubled: {doubled}</p>
+```
+
+## Component Props
+
+Define typed props with runes:
+
+```svelte
+<script lang="ts">
+  interface Props {
+    title: string;
+    count?: number;
+  }
+  
+  let { title, count = 0 }: Props = $props();
+</script>
+
+<h1>{title}</h1>
+<p>Count: {count}</p>
+```
+
+## Styling
+
+<Tabs>
+  <Tab title="Scoped Styles">
+    Styles in `<style>` tags are scoped to the component:
+    
+    ```svelte
+    <div class="card">
+      Content
+    </div>
+    
+    <style>
+      .card {
+        padding: 20px;
+        /* Only applies to this component */
+      }
+    </style>
+    ```
+  </Tab>
+  
+  <Tab title="Global Styles">
+    Use `:global()` for global styles:
+    
+    ```svelte
+    <style>
+      :global(body) {
+        margin: 0;
+        font-family: system-ui;
+      }
+    </style>
+    ```
+  </Tab>
+  
+  <Tab title="Dynamic Styles">
+    Bind styles to reactive state:
+    
+    ```svelte
+    <script>
+      let color = $state('red');
+    </script>
+    
+    <div style="color: {color}">
+      Text
+    </div>
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<Steps>
+  <Step title="Learn Runes">
+    Read the [Svelte 5 Runes documentation](https://svelte-5-preview.vercel.app/docs/runes)
+  </Step>
+  
+  <Step title="Add routing">
+    Install [svelte-routing](https://github.com/EmilTholin/svelte-routing) for navigation
+  </Step>
+  
+  <Step title="Add state management">
+    Use Svelte stores or [Pinia](https://pinia.vuejs.org/) for complex state
+  </Step>
+  
+  <Step title="Build your app">
+    Run `bun run build` to create a production build
+  </Step>
+</Steps>
+
+## Source Code
+
+View the complete template source on GitHub:
+[templates/svelte](https://github.com/blackboardsh/electrobun/tree/main/templates/svelte)

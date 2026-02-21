@@ -1,0 +1,729 @@
+---
+title: <electrobun-webview>
+description: API reference for the electrobun-webview custom HTML element
+---
+
+The `<electrobun-webview>` custom element allows you to embed isolated web content in your Electrobun application. It provides out-of-process iframe (OOPIF) rendering with advanced features like transparency, click-through regions, and navigation controls.
+
+## HTML Usage
+
+```html
+<electrobun-webview
+  src="https://example.com"
+  renderer="cef"
+  style="width: 800px; height: 600px;"
+></electrobun-webview>
+```
+
+## TypeScript Usage
+
+```typescript
+import type { WebviewTagElement } from "electrobun/view";
+
+const webview = document.querySelector('electrobun-webview') as WebviewTagElement;
+webview.loadURL('https://example.com');
+```
+
+## Attributes
+
+### `src`
+
+The URL to load in the webview.
+
+```html
+<electrobun-webview src="https://electrobun.dev"></electrobun-webview>
+```
+
+```typescript
+webview.src = "https://example.com";
+webview.setAttribute('src', 'https://example.com');
+```
+
+### `html`
+
+Inline HTML content to render instead of loading from a URL. Useful for simple embedded content.
+
+```html
+<electrobun-webview
+  html="<h1>Hello World</h1><p>Inline content</p>"
+  renderer="cef"
+  style="width: 400px; height: 200px;"
+></electrobun-webview>
+```
+
+```typescript
+webview.html = "<html><body><h1>Dynamic Content</h1></body></html>";
+```
+
+### `renderer`
+
+The rendering engine to use. Options: `"cef"` (Chromium Embedded Framework) or `"native"` (platform-native webview).
+
+```html
+<electrobun-webview renderer="cef" src="https://example.com"></electrobun-webview>
+```
+
+```typescript
+webview.renderer = "cef";
+```
+
+### `preload`
+
+JavaScript code to execute in the webview after the DOM is ready but before the page content loads.
+
+```html
+<electrobun-webview
+  src="https://example.com"
+  renderer="cef"
+  preload="window.customProperty = 'value'; console.log('Preload executed');"
+></electrobun-webview>
+```
+
+```typescript
+webview.preload = `
+  window.addEventListener('load', () => {
+    console.log('Page loaded');
+  });
+`;
+```
+
+### `partition`
+
+Session partition name for isolating storage, cookies, and cache. Webviews with the same partition share storage.
+
+```html
+<!-- These webviews share storage -->
+<electrobun-webview partition="persist:app1" src="https://example.com"></electrobun-webview>
+<electrobun-webview partition="persist:app1" src="https://example.org"></electrobun-webview>
+
+<!-- This webview has isolated storage -->
+<electrobun-webview partition="persist:app2" src="https://example.com"></electrobun-webview>
+```
+
+## Properties
+
+### `webviewId`
+
+<ResponseField name="webviewId" type="number | undefined" readonly>
+  Unique identifier for the webview instance
+</ResponseField>
+
+```typescript
+console.log("Webview ID:", webview.webviewId);
+```
+
+### `transparent`
+
+<ResponseField name="transparent" type="boolean">
+  Whether the webview background is transparent. Default: `false`
+</ResponseField>
+
+```typescript
+webview.transparent = true;
+```
+
+### `passthroughEnabled`
+
+<ResponseField name="passthroughEnabled" type="boolean">
+  Whether mouse and keyboard events pass through the webview to elements behind it. Default: `false`
+</ResponseField>
+
+```typescript
+webview.passthroughEnabled = true;
+```
+
+### `hidden`
+
+<ResponseField name="hidden" type="boolean">
+  Whether the webview is hidden. Default: `false`
+</ResponseField>
+
+```typescript
+webview.hidden = false;
+```
+
+### `hiddenMirrorMode`
+
+<ResponseField name="hiddenMirrorMode" type="boolean">
+  Special mode for hidden webviews. Default: `false`
+</ResponseField>
+
+### `maskSelectors`
+
+<ResponseField name="maskSelectors" type="Set<string>" readonly>
+  Set of CSS selectors for elements that should mask (overlay) the webview
+</ResponseField>
+
+```typescript
+console.log("Masks:", Array.from(webview.maskSelectors));
+```
+
+## Navigation Methods
+
+### `loadURL(url)`
+
+Loads the specified URL in the webview.
+
+<ParamField path="url" type="string" required>
+  The URL to load
+</ParamField>
+
+```typescript
+webview.loadURL('https://electrobun.dev');
+webview.loadURL('views://app/index.html');
+```
+
+### `loadHTML(html)`
+
+Loads HTML content directly into the webview.
+
+<ParamField path="html" type="string" required>
+  The HTML content to render
+</ParamField>
+
+```typescript
+webview.loadHTML('<html><body><h1>Hello!</h1></body></html>');
+```
+
+### `goBack()`
+
+Navigates to the previous page in the webview's history.
+
+```typescript
+webview.goBack();
+```
+
+### `goForward()`
+
+Navigates to the next page in the webview's history.
+
+```typescript
+webview.goForward();
+```
+
+### `reload()`
+
+Reloads the current page.
+
+```typescript
+webview.reload();
+```
+
+### `canGoBack()`
+
+Checks if the webview can navigate backwards.
+
+<ResponseField name="return" type="Promise<boolean>">
+  `true` if backward navigation is available
+</ResponseField>
+
+```typescript
+const canGoBack = await webview.canGoBack();
+if (canGoBack) {
+  webview.goBack();
+}
+```
+
+### `canGoForward()`
+
+Checks if the webview can navigate forwards.
+
+<ResponseField name="return" type="Promise<boolean>">
+  `true` if forward navigation is available
+</ResponseField>
+
+```typescript
+const canGoForward = await webview.canGoForward();
+if (canGoForward) {
+  webview.goForward();
+}
+```
+
+### `setNavigationRules(rules)`
+
+Sets URL patterns to control navigation behavior.
+
+<ParamField path="rules" type="string[]" required>
+  Array of URL patterns (glob-style)
+</ParamField>
+
+```typescript
+webview.setNavigationRules([
+  'https://example.com/*',
+  'https://*.example.org/*'
+]);
+```
+
+## Display Methods
+
+### `toggleTransparent(transparent?, bypassState?)`
+
+Toggles or sets the transparency of the webview background.
+
+<ParamField path="transparent" type="boolean">
+  Whether to enable transparency. If omitted, toggles the current state.
+</ParamField>
+
+<ParamField path="bypassState" type="boolean">
+  Internal parameter for state management
+</ParamField>
+
+```typescript
+// Toggle transparency
+webview.toggleTransparent();
+
+// Set transparency explicitly
+webview.toggleTransparent(true);
+```
+
+### `togglePassthrough(enablePassthrough?, bypassState?)`
+
+Toggles or sets click-through behavior, allowing mouse events to pass through the webview.
+
+<ParamField path="enablePassthrough" type="boolean">
+  Whether to enable passthrough. If omitted, toggles the current state.
+</ParamField>
+
+<ParamField path="bypassState" type="boolean">
+  Internal parameter for state management
+</ParamField>
+
+```typescript
+// Toggle passthrough
+webview.togglePassthrough();
+
+// Enable passthrough explicitly
+webview.togglePassthrough(true);
+```
+
+### `toggleHidden(hidden?, bypassState?)`
+
+Toggles or sets the visibility of the webview.
+
+<ParamField path="hidden" type="boolean">
+  Whether to hide the webview. If omitted, toggles the current state.
+</ParamField>
+
+<ParamField path="bypassState" type="boolean">
+  Internal parameter for state management
+</ParamField>
+
+```typescript
+// Toggle visibility
+webview.toggleHidden();
+
+// Hide explicitly
+webview.toggleHidden(true);
+```
+
+### `syncDimensions(force?)`
+
+Synchronizes the webview dimensions with its container.
+
+<ParamField path="force" type="boolean">
+  Whether to force synchronization even if dimensions haven't changed
+</ParamField>
+
+```typescript
+webview.syncDimensions();
+```
+
+## Mask Methods
+
+Masks allow you to define regions that overlay the webview, preventing interaction with those areas.
+
+### `addMaskSelector(selector)`
+
+Adds a CSS selector to identify elements that should mask the webview.
+
+<ParamField path="selector" type="string" required>
+  CSS selector for mask elements
+</ParamField>
+
+```typescript
+webview.addMaskSelector('.overlay');
+webview.addMaskSelector('#toolbar');
+```
+
+```html
+<div style="position: relative;">
+  <div class="overlay" style="position: absolute; top: 0; left: 0; width: 200px; height: 100px; background: rgba(0,0,0,0.5);"></div>
+  <electrobun-webview renderer="cef" style="width: 600px; height: 400px;" src="https://example.com"></electrobun-webview>
+</div>
+
+<script>
+  const webview = document.querySelector('electrobun-webview');
+  webview.addMaskSelector('.overlay');
+</script>
+```
+
+### `removeMaskSelector(selector)`
+
+Removes a CSS selector from the mask list.
+
+<ParamField path="selector" type="string" required>
+  CSS selector to remove
+</ParamField>
+
+```typescript
+webview.removeMaskSelector('.overlay');
+```
+
+## Find in Page
+
+### `findInPage(searchText, options?)`
+
+Searches for text within the webview content.
+
+<ParamField path="searchText" type="string" required>
+  The text to search for
+</ParamField>
+
+<ParamField path="options" type="object">
+  Search options
+  
+  <ParamField path="options.forward" type="boolean">
+    Search forward (`true`) or backward (`false`). Default: `true`
+  </ParamField>
+  
+  <ParamField path="options.matchCase" type="boolean">
+    Whether the search is case-sensitive. Default: `false`
+  </ParamField>
+</ParamField>
+
+```typescript
+// Simple search
+webview.findInPage('hello');
+
+// Search backwards
+webview.findInPage('world', { forward: false });
+
+// Case-sensitive search
+webview.findInPage('JavaScript', { matchCase: true });
+```
+
+### `stopFindInPage()`
+
+Stops the current find-in-page operation and clears highlighting.
+
+```typescript
+webview.stopFindInPage();
+```
+
+## Developer Tools
+
+### `openDevTools()`
+
+Opens the Chrome DevTools for the webview.
+
+```typescript
+webview.openDevTools();
+```
+
+### `closeDevTools()`
+
+Closes the Chrome DevTools.
+
+```typescript
+webview.closeDevTools();
+```
+
+### `toggleDevTools()`
+
+Toggles the Chrome DevTools open or closed.
+
+```typescript
+webview.toggleDevTools();
+```
+
+## Events
+
+### `on(event, listener)`
+
+Registers an event listener.
+
+<ParamField path="event" type="WebviewEventTypes" required>
+  Event name. See [Event Types](#event-types) below.
+</ParamField>
+
+<ParamField path="listener" type="(event: CustomEvent) => void" required>
+  Callback function that receives a CustomEvent with a `detail` property
+</ParamField>
+
+```typescript
+webview.on('dom-ready', (event) => {
+  console.log('DOM is ready:', event.detail);
+});
+
+webview.on('did-navigate', (event) => {
+  console.log('Navigation complete:', event.detail);
+});
+```
+
+### `off(event, listener)`
+
+Removes an event listener.
+
+<ParamField path="event" type="WebviewEventTypes" required>
+  Event name
+</ParamField>
+
+<ParamField path="listener" type="(event: CustomEvent) => void" required>
+  The callback function to remove
+</ParamField>
+
+```typescript
+const handler = (event) => console.log('Navigated');
+webview.on('did-navigate', handler);
+// Later...
+webview.off('did-navigate', handler);
+```
+
+### `emit(event, detail)`
+
+Emits a custom event. Primarily used internally.
+
+<ParamField path="event" type="WebviewEventTypes" required>
+  Event name
+</ParamField>
+
+<ParamField path="detail" type="unknown" required>
+  Event data
+</ParamField>
+
+## Event Types
+
+### `did-navigate`
+
+Fired when navigation to a new page completes.
+
+```typescript
+webview.on('did-navigate', (event) => {
+  console.log('Navigated to:', event.detail?.url);
+});
+```
+
+### `did-navigate-in-page`
+
+Fired when in-page navigation occurs (e.g., hash change, pushState).
+
+```typescript
+webview.on('did-navigate-in-page', (event) => {
+  console.log('In-page navigation:', event.detail);
+});
+```
+
+### `did-commit-navigation`
+
+Fired when navigation is committed (before the page loads).
+
+```typescript
+webview.on('did-commit-navigation', (event) => {
+  console.log('Navigation committed:', event.detail);
+});
+```
+
+### `dom-ready`
+
+Fired when the DOM is ready, before external resources are loaded.
+
+```typescript
+webview.on('dom-ready', (event) => {
+  console.log('DOM ready');
+  // Good time to inject scripts
+});
+```
+
+### `host-message`
+
+Fired when the webview sends a message to the host using `window.__electrobunSendToHost()`.
+
+```typescript
+webview.on('host-message', (event) => {
+  console.log('Message from webview:', event.detail);
+});
+```
+
+**In the webview:**
+```html
+<script>
+  // Send message to host
+  window.__electrobunSendToHost({
+    type: 'button-click',
+    data: { buttonId: 'submit' }
+  });
+</script>
+```
+
+**In the host:**
+```typescript
+webview.on('host-message', (event) => {
+  if (event.detail.type === 'button-click') {
+    console.log('Button clicked:', event.detail.data.buttonId);
+  }
+});
+```
+
+### `new-window-open`
+
+Fired when the webview attempts to open a new window (e.g., `window.open()`, `target="_blank"`).
+
+```typescript
+webview.on('new-window-open', (event) => {
+  console.log('New window requested:', event.detail?.url);
+  // Handle the new window request
+});
+```
+
+## Complete Examples
+
+### Basic Webview Setup
+
+```html
+<!DOCTYPE html>
+<html>
+<body>
+  <electrobun-webview
+    id="myWebview"
+    renderer="cef"
+    src="https://electrobun.dev"
+    style="width: 800px; height: 600px;"
+  ></electrobun-webview>
+
+  <script type="module">
+    import type { WebviewTagElement } from "electrobun/view";
+
+    const webview = document.getElementById('myWebview') as WebviewTagElement;
+
+    webview.on('dom-ready', () => {
+      console.log('Webview is ready');
+    });
+
+    webview.on('did-navigate', (event) => {
+      console.log('Navigated to:', event.detail);
+    });
+  </script>
+</body>
+</html>
+```
+
+### Interactive Navigation
+
+```html
+<div>
+  <button onclick="webview.goBack()">Back</button>
+  <button onclick="webview.goForward()">Forward</button>
+  <button onclick="webview.reload()">Reload</button>
+  <button onclick="checkNavigation()">Check Nav State</button>
+</div>
+
+<electrobun-webview
+  id="webview"
+  renderer="cef"
+  src="https://example.com"
+  style="width: 100%; height: 600px;"
+></electrobun-webview>
+
+<script>
+  const webview = document.getElementById('webview');
+
+  async function checkNavigation() {
+    const canGoBack = await webview.canGoBack();
+    const canGoForward = await webview.canGoForward();
+    console.log(`Can go back: ${canGoBack}, Can go forward: ${canGoForward}`);
+  }
+</script>
+```
+
+### Transparent Overlay Webview
+
+```html
+<div style="position: relative; width: 800px; height: 600px;">
+  <!-- Background content -->
+  <div style="padding: 20px;">
+    <h1>Background Content</h1>
+    <p>This is behind the webview</p>
+  </div>
+
+  <!-- Transparent webview overlay -->
+  <electrobun-webview
+    id="overlay"
+    renderer="cef"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+    html="<div style='background: rgba(0,0,0,0.5); padding: 40px; color: white;'><h2>Overlay Content</h2></div>"
+  ></electrobun-webview>
+</div>
+
+<script>
+  const overlay = document.getElementById('overlay');
+  overlay.toggleTransparent(true);
+</script>
+```
+
+### Host Message Communication
+
+```html
+<electrobun-webview
+  id="messageWebview"
+  renderer="cef"
+  src="views://app/content.html"
+  style="width: 600px; height: 400px;"
+></electrobun-webview>
+
+<div id="log"></div>
+
+<script>
+  const webview = document.getElementById('messageWebview');
+  const log = document.getElementById('log');
+
+  webview.on('host-message', (event) => {
+    const message = event.detail;
+    log.innerHTML += `<div>Received: ${JSON.stringify(message)}</div>`;
+  });
+</script>
+```
+
+**In `content.html`:**
+```html
+<button onclick="sendMessage()">Send to Host</button>
+
+<script>
+  function sendMessage() {
+    window.__electrobunSendToHost({
+      type: 'user-action',
+      timestamp: Date.now(),
+      action: 'button-click'
+    });
+  }
+</script>
+```
+
+### Session Partitions
+
+```html
+<!-- These webviews share localStorage and cookies -->
+<electrobun-webview
+  partition="persist:session1"
+  src="https://example.com"
+  style="width: 400px; height: 300px;"
+></electrobun-webview>
+
+<electrobun-webview
+  partition="persist:session1"
+  src="https://example.com/page2"
+  style="width: 400px; height: 300px;"
+></electrobun-webview>
+
+<!-- This webview has isolated storage -->
+<electrobun-webview
+  partition="persist:session2"
+  src="https://example.com"
+  style="width: 400px; height: 300px;"
+></electrobun-webview>
+```
+
+## Related
+
+- [Electroview](/api/electroview) - RPC communication in webview processes
+- [BrowserWindow](/api/browser-window) - Creating windows that contain webviews
+- [Webview Guide](/guides/working-with-views) - Complete guide to working with webviews

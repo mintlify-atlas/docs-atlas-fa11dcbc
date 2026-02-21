@@ -1,0 +1,131 @@
+---
+title: electrobun init
+description: Initialize a new Electrobun project from a template
+---
+
+The `init` command creates a new Electrobun project from a built-in template with all necessary files and folder structure.
+
+## Usage
+
+<CodeGroup>
+```bash npm
+npx electrobun init [project-name] [--template=template-name]
+```
+
+```bash bun
+bun x electrobun init [project-name] [--template=template-name]
+```
+
+```bash pnpm
+pnpm dlx electrobun init [project-name] [--template=template-name]
+```
+
+```bash yarn
+yarn dlx electrobun init [project-name] [--template=template-name]
+```
+</CodeGroup>
+
+## Arguments
+
+<ParamField path="project-name" type="string" optional>
+  Name of the project directory to create. If omitted, you'll be prompted interactively.
+</ParamField>
+
+## Options
+
+<ParamField path="--template" type="string" optional>
+  Template to use for initialization. If omitted, you'll see an interactive menu with available templates.
+</ParamField>
+
+## Interactive Mode
+
+When you run `electrobun init` without arguments, you'll be guided through an interactive setup:
+
+```bash
+electrobun init
+```
+
+This will:
+1. Display a list of available templates
+2. Prompt you to select a template
+3. Ask for a project name (with a sensible default)
+
+## Examples
+
+### Interactive initialization
+
+```bash
+electrobun init
+```
+
+You'll see:
+
+```
+🚀 Welcome to Electrobun!
+
+Available templates:
+  1. photo-booth
+  2. another-template
+
+Select a template (enter number): 1
+Enter project name (default: my-photo-booth-app): my-awesome-app
+```
+
+### Quick initialization with template name
+
+```bash
+electrobun init photo-booth
+```
+
+Uses "photo-booth" as both the template and project name.
+
+### Traditional syntax with custom project name
+
+```bash
+electrobun init my-awesome-app --template=photo-booth
+```
+
+Creates a project named "my-awesome-app" using the "photo-booth" template.
+
+## After Initialization
+
+Once your project is created, follow these steps:
+
+<CodeGroup>
+```bash npm
+cd my-awesome-app
+npm install
+npm start
+```
+
+```bash bun
+cd my-awesome-app
+bun install
+bun start
+```
+
+```bash pnpm
+cd my-awesome-app
+pnpm install
+pnpm start
+```
+
+```bash yarn
+cd my-awesome-app
+yarn install
+yarn start
+```
+</CodeGroup>
+
+## Project Structure
+
+The initialized project includes:
+
+- **electrobun.config.ts** - Main configuration file
+- **src/bun/** - Bun process code (Node.js-compatible backend)
+- **src/views/** - Browser view code (frontend)
+- **package.json** - Project dependencies and scripts
+
+<Note>
+Electrobun is NOT Electron. It has a different architecture and APIs. Don't use Electron patterns or documentation.
+</Note>
