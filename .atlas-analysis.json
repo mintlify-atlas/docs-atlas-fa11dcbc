@@ -1,0 +1,173 @@
+{
+  "projectType": "framework",
+  "projectName": "Electrobun",
+  "projectDescription": "Build ultra fast, tiny, and cross-platform desktop apps with Typescript.",
+  "theme": "palm",
+  "primaryColor": "#5B7FFF",
+  "lightColor": "#7B9FFF",
+  "darkColor": "#3B5FDF",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/main-process",
+              "concepts/webview-process",
+              "concepts/rpc-communication",
+              "concepts/building-and-packaging"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/creating-windows",
+              "guides/working-with-views",
+              "guides/inter-process-communication",
+              "guides/menus-and-trays",
+              "guides/auto-updates",
+              "guides/native-integrations",
+              "guides/platform-specific-features"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/config-file",
+              "configuration/build-options",
+              "configuration/platform-options",
+              "configuration/runtime-options"
+            ]
+          },
+          {
+            "group": "CLI",
+            "pages": [
+              "cli/init",
+              "cli/build",
+              "cli/commands"
+            ]
+          },
+          {
+            "group": "Distribution",
+            "pages": [
+              "distribution/packaging",
+              "distribution/code-signing",
+              "distribution/auto-updates",
+              "distribution/release-channels"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Main Process",
+            "pages": [
+              "api/browser-window",
+              "api/browser-view",
+              "api/tray",
+              "api/application-menu",
+              "api/context-menu",
+              "api/updater",
+              "api/utils",
+              "api/global-shortcut",
+              "api/screen",
+              "api/session",
+              "api/socket",
+              "api/paths"
+            ]
+          },
+          {
+            "group": "Webview Process",
+            "pages": [
+              "api/electroview",
+              "api/webview-tag"
+            ]
+          },
+          {
+            "group": "RPC System",
+            "pages": [
+              "api/rpc-overview",
+              "api/create-rpc",
+              "api/define-electrobun-rpc"
+            ]
+          },
+          {
+            "group": "Types & Interfaces",
+            "pages": [
+              "api/types/window-options",
+              "api/types/view-options",
+              "api/types/menu-types",
+              "api/types/update-types",
+              "api/types/event-types"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Templates",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "templates/overview"
+            ]
+          },
+          {
+            "group": "Available Templates",
+            "pages": [
+              "templates/hello-world",
+              "templates/react-tailwind-vite",
+              "templates/svelte",
+              "templates/multitab-browser",
+              "templates/photo-booth"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Write TypeScript for main process and webviews",
+    "Fast, typed RPC between processes with isolation",
+    "Small self-extracting bundles (~12MB with system webview)",
+    "Tiny app updates (14KB patches using bsdiff)",
+    "Built-in auto-update system with delta patching",
+    "Cross-platform (macOS, Windows, Linux)",
+    "Native window management and system integration",
+    "Powered by Bun runtime for speed",
+    "CLI-based workflow for rapid development",
+    "Multiple renderer options (native WebView or CEF)"
+  ],
+  "publicApiSurface": [
+    "BrowserWindow - Create and manage app windows",
+    "BrowserView - Embed web content in windows",
+    "Tray - System tray integration",
+    "ApplicationMenu - Native application menus",
+    "ContextMenu - Right-click context menus",
+    "Updater - Auto-update functionality",
+    "Utils - System dialogs and notifications",
+    "GlobalShortcut - Register global keyboard shortcuts",
+    "Screen - Display information",
+    "Session - Cookie and storage management",
+    "Socket - WebSocket server for IPC",
+    "PATHS - Application paths",
+    "Electroview - Webview-side API wrapper",
+    "createRPC - Create custom RPC channels",
+    "defineElectrobunRPC - Define type-safe RPC schemas",
+    "CLI: electrobun init - Initialize new project",
+    "CLI: electrobun build - Build application"
+  ]
+}
